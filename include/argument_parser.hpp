@@ -224,6 +224,7 @@ namespace argument_parser {
             invoked(other.invoked) 
         {}
         argument& operator=(argument const& other) {
+            if (this == &other) return *this; 
             this->~argument(); 
             new(this) argument{other};
             return *this; 
