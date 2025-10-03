@@ -1,5 +1,5 @@
 #pragma once
-#include "base_convention.hpp"
+#include <base_convention.hpp>
 #include <atomic>
 #include <cstdlib>
 #include <functional>
@@ -16,6 +16,7 @@
 
 #include <type_traits>
 #include <string>
+
 
 namespace argument_parser {
     namespace function {
@@ -501,6 +502,8 @@ namespace argument_parser {
 
         friend class linux_parser; 
         friend class windows_parser; 
+        friend class macos_parser; 
+        friend class fake_parser; 
     };
 }
 

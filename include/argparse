@@ -1,0 +1,27 @@
+#pragma once
+#ifndef ARGPARSE_HPP
+#define ARGPARSE_HPP
+#include <argument_parser.hpp>
+#
+#ifdef __linux__
+#include <linux_parser.hpp>
+namespace argument_parser {
+    using parser = linux_parser; 
+}
+#elif __APPLE__
+#include <macos_parser.hpp>
+namespace argument_parser {
+    using parser = macos_parser; 
+}
+#elif _WIN32
+#include <windows_parser.hpp>
+namespace argument_parser {
+    using parser = windows_parser; 
+}
+#else
+#error "Unsupported platform"
+#endif
+#endif
+
+#include <base_convention.hpp>
+#include <gnu_argument_convention.hpp>

@@ -1,11 +1,11 @@
 #pragma once
-#include <fstream>
-#include <string>
 
 #ifdef __linux__
 #ifndef LINUX_PARSER_HPP
+#include <fstream>
+#include <string>
 
-#include "argument_parser.hpp"
+#include <argument_parser.hpp>
 
 namespace argument_parser {
     class linux_parser : public base_parser {
