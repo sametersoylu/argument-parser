@@ -1,12 +1,9 @@
-#include "argument_parser.hpp"
-#include "fake_parser.hpp"
 #include <argparse>
 #include <cstdlib>
 #include <iostream>
 #include <fstream>
 #include <memory>
 #include <utility>
-#include <vector>
 
 using namespace argument_parser::conventions;
 
@@ -108,8 +105,9 @@ auto make_grep_action(argument_parser::base_parser& parser) {
 }
 
 int main() {
-    std::vector<std::string> fake_args = { "-g", "add", "-f", "src/main.cpp", "-ep", "1,2" };
-    auto parser = argument_parser::fake_parser{"test", std::move(fake_args)};
+    // std::vector<std::string> fake_args = { "-g", "add", "-f", "src/main.cpp", "-ep", "1,2" };
+    // auto parser = argument_parser::fake_parser{"test", std::move(fake_args)};
+    auto parser = argument_parser::parser{};
     auto [file, grep] = make_grep_action(parser); 
     parser.add_argument("e", "echo", "echoes given variable", echo, false);
     parser.add_argument("ep", "echo-point", "echoes given point", echo_point, false);

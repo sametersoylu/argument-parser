@@ -12,64 +12,106 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <unordered_map>
 #include <vector>
-#include <variant> 
 
 namespace argument_parser {
-    template <typename T>
-    class parametered_action {
+    class action_base {
     public:
-        // Type alias to expose the parameter type, crucial for the visitor.
+        virtual ~action_base() = default;
+        virtual bool expects_parameter() const = 0;
+        virtual void invoke() const = 0;
+        virtual void invoke_with_parameter(const std::string& param) const = 0;
+        virtual std::unique_ptr<action_base> clone() const = 0;
+    };
+
+    template <typename T>
+    class parametered_action : public action_base {
+    public:
+        explicit parametered_action(std::function<void(const T&)> const& handler) : handler(handler) {}
+        
         using parameter_type = T;
         
-        parametered_action(std::function<void(const T&)> const& function) : handler(function) {}
-
         void invoke(const T& arg) const {
             handler(arg);
+        }
+
+        bool expects_parameter() const override { return true; }
+        
+        void invoke() const override {
+            throw std::runtime_error("Parametered action requires a parameter");
+        }
+        
+        void invoke_with_parameter(const std::string& param) const override {
+            T parsed_value = parsing_traits::parser_trait<T>::parse(param);
+            invoke(parsed_value);
+        }
+        
+        std::unique_ptr<action_base> clone() const override {
+            return std::make_unique<parametered_action<T>>(handler);
         }
 
     private:
         std::function<void(const T&)> handler;
     };
 
-    class non_parametered_action {
+    class non_parametered_action : public action_base {
     public:
-        non_parametered_action(std::function<void()> const& function) : handler(function) {}
+        explicit non_parametered_action(std::function<void()> const& handler) : handler(handler) {}
         
-        void invoke() const {
+        void invoke() const override {
             handler();
+        }
+
+        bool expects_parameter() const override { return false; }
+        
+        void invoke_with_parameter(const std::string& param) const override {
+            invoke();
+        }
+        
+        std::unique_ptr<action_base> clone() const override {
+            return std::make_unique<non_parametered_action>(handler);
         }
 
     private:
         std::function<void()> handler;
     };
 
-    using action_variant = std::variant<
-        non_parametered_action,
-        parametered_action<std::string>,
-        parametered_action<int>,
-        parametered_action<float>,
-        parametered_action<bool>
-    >;
-
     class base_parser;
 
     class argument {
     public:
-        argument() : id(0), name(), required(false), invoked(false), action(non_parametered_action([](){})) {}
+        argument() : id(0), name(), required(false), invoked(false), action(std::make_unique<non_parametered_action>([](){})) {}
 
         template <typename ActionType>
         argument(int id, std::string const& name, ActionType const& action) 
-            : id(id), name(name), action(action), required(false), invoked(false) {}
+            : id(id), name(name), action(action.clone()), required(false), invoked(false) {}
+
+        argument(const argument& other) 
+            : id(other.id), name(other.name), action(other.action->clone()), 
+              required(other.required), invoked(other.invoked), help_text(other.help_text) {}
+
+        argument& operator=(const argument& other) {
+            if (this != &other) {
+                id = other.id;
+                name = other.name;
+                action = other.action->clone();
+                required = other.required;
+                invoked = other.invoked;
+                help_text = other.help_text;
+            }
+            return *this;
+        }
+
+        argument(argument&& other) noexcept = default;
+        argument& operator=(argument&& other) noexcept = default;
 
         bool is_required() const { return required; }
         std::string get_name() const { return name; }
         bool is_invoked() const { return invoked; }
 
         bool expects_parameter() const {
-            return !std::holds_alternative<non_parametered_action>(action);
+            return action->expects_parameter();
         }
 
     private:
@@ -81,7 +123,7 @@ namespace argument_parser {
 
         int id;
         std::string name;
-        action_variant action;
+        std::unique_ptr<action_base> action;
         bool required;
         bool invoked;
         std::string help_text;
@@ -138,24 +180,15 @@ namespace argument_parser {
                     try {
                         argument& corresponding_argument = get_argument(extracted);
                         
-                        std::visit([&](auto&& action) {
-                            using ActionType = std::decay_t<decltype(action)>;
-                            
-                            if constexpr (std::is_same_v<ActionType, non_parametered_action>) {
-                                action.invoke();
-                            } else {
-                                if (convention_type->requires_next_token() && (it + 1) == parsed_arguments.end()) {
-                                    throw std::runtime_error("expected value for argument " + extracted.second);
-                                }
-                                auto value_raw = convention_type->requires_next_token() ? *(++it) : convention_type->extract_value(*it);
-                                
-                                using ParamType = typename ActionType::parameter_type;
-                                
-                                auto value = parsing_traits::parser_trait<ParamType>::parse(value_raw);
-                                
-                                action.invoke(value);
+                        if (corresponding_argument.expects_parameter()) {
+                            if (convention_type->requires_next_token() && (it + 1) == parsed_arguments.end()) {
+                                throw std::runtime_error("expected value for argument " + extracted.second);
                             }
-                        }, corresponding_argument.action);
+                            auto value_raw = convention_type->requires_next_token() ? *(++it) : convention_type->extract_value(*it);
+                            corresponding_argument.action->invoke_with_parameter(value_raw);
+                        } else {
+                            corresponding_argument.action->invoke();
+                        }
 
                         corresponding_argument.set_invoked(true);
                         arg_correctly_handled = true;
