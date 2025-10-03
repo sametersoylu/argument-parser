@@ -10,6 +10,23 @@
 
 using namespace argument_parser::conventions;
 
+struct Point {
+    int x, y;
+};
+
+template<>
+struct argument_parser::parsing_traits::parser_trait<Point> {
+    static Point parse(const std::string& input) {
+        auto comma_pos = input.find(',');
+        if (comma_pos == std::string::npos) {
+            throw std::runtime_error("Invalid Point format. Expected 'x,y'.");
+        }
+        int x = std::stoi(input.substr(0, comma_pos));
+        int y = std::stoi(input.substr(comma_pos + 1));
+        return {x, y};
+    }
+};
+
 const std::initializer_list<argument_parser::conventions::convention const* const> conventions = {
     &gnu_argument_convention,
     &gnu_equal_argument_convention 
@@ -17,6 +34,11 @@ const std::initializer_list<argument_parser::conventions::convention const* cons
 
 const auto echo = argument_parser::helpers::make_parametered_action<std::string>([](std::string const& text) {
     std::cout << text << std::endl; 
+});
+
+
+const auto echo_point = argument_parser::helpers::make_parametered_action<Point>([](Point const& point) {
+    std::cout << "Point(" << point.x << ", " << point.y << ")" << std::endl; 
 });
 
 const auto cat = argument_parser::helpers::make_parametered_action<std::string>([](std::string const& file_name) {
@@ -86,10 +108,11 @@ auto make_grep_action(argument_parser::base_parser& parser) {
 }
 
 int main() {
-    std::vector<std::string> fake_args = { "-g", "add", "-f", "src/main.cpp" };
+    std::vector<std::string> fake_args = { "-g", "add", "-f", "src/main.cpp", "-ep", "1,2" };
     auto parser = argument_parser::fake_parser{"test", std::move(fake_args)};
     auto [file, grep] = make_grep_action(parser); 
     parser.add_argument("e", "echo", "echoes given variable", echo, false);
+    parser.add_argument("ep", "echo-point", "echoes given point", echo_point, false);
     parser.add_argument("f", "file", "File to grep, required only if using grep", file, false);
     parser.add_argument("g", "grep", "Grep pattern, required only if using grep", grep, false);
     parser.add_argument("c", "cat", "Prints the content of the file", cat, false);

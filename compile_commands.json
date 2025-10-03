@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/Users/killua/Projects/argument-parser/build",
+  "command": "/usr/bin/clang++ -I/Users/killua/Projects/argument-parser/include -I/Users/killua/Projects/argument-parser/include/parser -I/Users/killua/Projects/argument-parser/include/conventions -I/Users/killua/Projects/argument-parser/include/conventions/implementations -I/Users/killua/Projects/argument-parser/include/parser/platform_headers -I/Users/killua/Projects/argument-parser/include/parser/parsing_traits -g -std=gnu++2b -arch arm64 -o CMakeFiles/test.dir/src/main.cpp.o -c /Users/killua/Projects/argument-parser/src/main.cpp",
+  "file": "/Users/killua/Projects/argument-parser/src/main.cpp",
+  "output": "/Users/killua/Projects/argument-parser/build/CMakeFiles/test.dir/src/main.cpp.o"
+}
+]
