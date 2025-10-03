@@ -4,7 +4,6 @@
 #define FAKE_PARSER_HPP
 
 #include <argument_parser.hpp>
-#include <crt_externs.h>
 #include <initializer_list>
 #include <string>
 
