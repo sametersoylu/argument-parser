@@ -107,7 +107,7 @@ auto make_grep_action(argument_parser::base_parser& parser) {
 int main() {
     auto parser = argument_parser::parser{};
     auto [file, grep] = make_grep_action(parser); 
-    
+
     parser.add_argument("e", "echo", "echoes given variable", echo, false);
     parser.add_argument("ep", "echo-point", "echoes given point", echo_point, false);
     parser.add_argument("f", "file", "File to grep, required only if using grep", file, false);
@@ -118,7 +118,7 @@ int main() {
     }), false);
 
     parser.add_argument<std::string>("t", "test_store", "Test store", false); 
-
+    parser.add_argument<Point>("p", "point", "Test point", false);
     parser.handle_arguments(conventions);
 
     auto store = parser.get_optional<std::string>("test_store"); 
@@ -126,6 +126,13 @@ int main() {
         std::cout << "Stored value: " << store.value() << std::endl;
     } else {
         std::cout << "No stored value." << std::endl;
+    }
+
+    auto point = parser.get_optional<Point>("point");
+    if (point.has_value()) {
+        std::cout << "Stored point: " << point.value().x << ", " << point.value().y << std::endl;
+    } else {
+        std::cout << "No stored point." << std::endl;
     }
     
     return 0; 
