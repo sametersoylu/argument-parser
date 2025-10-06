@@ -1,3 +1,5 @@
+#define ALLOW_DASH_FOR_WINDOWS 0
+
 #include <argparse>
 #include <cstdlib>
 #include <iostream>

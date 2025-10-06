@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <algorithm>
 #include <utility>
 
 #ifndef BASE_CONVENTION_HPP
@@ -29,6 +30,20 @@ namespace argument_parser::conventions {
         ~base_convention() = default;
     };
     using convention = base_convention; 
+}
+
+namespace argument_parser::conventions::helpers {
+    static std::string to_lower(std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(),
+            [](unsigned char c) { return std::tolower(c); });
+        return s;
+    }
+
+    static std::string to_upper(std::string s) {
+        std::transform(s.begin(), s.end(), s.begin(),
+            [](unsigned char c) { return std::toupper(c); });
+        return s;
+    }
 }
 
 #endif
