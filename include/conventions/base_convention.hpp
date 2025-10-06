@@ -9,6 +9,8 @@ namespace argument_parser::conventions {
     enum class argument_type {
         SHORT,
         LONG,
+		POSITIONAL,
+        INTERCHANGABLE,
         ERROR
     };
 

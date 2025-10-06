@@ -1,4 +1,3 @@
-#include "argument_parser.hpp"
 #include <argparse>
 #include <cstdlib>
 #include <iostream>
@@ -6,7 +5,6 @@
 #include <regex>
 #include <vector>
 
-using namespace argument_parser::conventions;
 
 struct Point {
     int x, y;
@@ -69,8 +67,10 @@ struct argument_parser::parsing_traits::parser_trait<std::vector<std::string>> {
 };
 
 const std::initializer_list<argument_parser::conventions::convention const* const> conventions = {
-    &gnu_argument_convention,
-    &gnu_equal_argument_convention 
+    &argument_parser::conventions::gnu_argument_convention,
+    &argument_parser::conventions::gnu_equal_argument_convention,
+	&argument_parser::conventions::windows_argument_convention,
+	&argument_parser::conventions::windows_equal_argument_convention
 }; 
 
 const auto echo = argument_parser::helpers::make_parametered_action<std::string>([](std::string const& text) {
@@ -150,7 +150,14 @@ int main() {
     parser.add_argument<std::vector<int>>("t", "test", "Test vector<int>", false);
     parser.add_argument<std::vector<std::string>>("ts", "test-strings", "Test vector<string>", false);
     parser.on_complete(::run_grep); 
-    parser.handle_arguments(conventions);
+    try {
+        parser.handle_arguments(conventions);
+    } catch(std::exception const& e) {
+        std::cerr << "Error: " << e.what() << std::endl; 
+        parser.display_help(conventions); 
+        return -1; 
+	}
+    
    
     auto test = parser.get_optional<std::vector<int>>("test");
     if (test) {

@@ -194,10 +194,16 @@ namespace argument_parser {
         }
 
         argument& get_argument(conventions::parsed_argument const& arg) {
+
             if (arg.first == conventions::argument_type::LONG) {
                 auto long_pos = long_arguments.find(arg.second);
                 if (long_pos != long_arguments.end()) return argument_map.at(long_pos->second);
             } else if (arg.first == conventions::argument_type::SHORT) {
+                auto short_pos = short_arguments.find(arg.second);
+                if (short_pos != short_arguments.end()) return argument_map.at(short_pos->second);
+            } else if (arg.first == conventions::argument_type::INTERCHANGABLE) {
+                auto long_pos = long_arguments.find(arg.second);
+                if (long_pos != long_arguments.end()) return argument_map.at(long_pos->second);
                 auto short_pos = short_arguments.find(arg.second);
                 if (short_pos != short_arguments.end()) return argument_map.at(short_pos->second);
             }
