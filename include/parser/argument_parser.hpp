@@ -150,6 +150,11 @@ namespace argument_parser {
             base_add_argument(short_arg, long_arg, help_text, action, required);
         }
 
+        template<typename T>
+        void add_argument(std::string const& short_arg, std::string const& long_arg, std::string const& help_text, bool required) {
+            base_add_argument<T>(short_arg, long_arg, help_text, required);
+        }
+
         void add_argument(std::string const& short_arg, std::string const& long_arg, std::string const& help_text, non_parametered_action const& action, bool required) {
             base_add_argument(short_arg, long_arg, help_text, action, required);
         }
@@ -157,16 +162,14 @@ namespace argument_parser {
         void add_argument(std::string const& short_arg, std::string const& long_arg, std::string const& help_text, bool required) {
             base_add_argument<void>(short_arg, long_arg, help_text, required);
         }
-        
-        template<typename T>
-        void add_argument(std::string const& short_arg, std::string const& long_arg, std::string const& help_text, bool required) {
-            base_add_argument<T>(short_arg, long_arg, help_text, required);
-        }
 
         template<typename T>
         std::optional<T> get_optional(std::string const& arg) {
             auto id = find_argument_id(arg); 
-            if (id.has_value()) return std::any_cast<T>(stored_arguments[id.value()]);
+            if (id.has_value()) {
+                auto value =  stored_arguments[id.value()];
+                if (value.has_value()) return std::any_cast<T>(value);
+            }
             return std::nullopt;
         }
 
