@@ -1,4 +1,4 @@
-# TODO 1: After Parse callback
+# TODO 1: After Parse callback [COMPLETED]
 Currently interdependent arguments are a problem. In the current version we are handling them as closures. 
 We create two stateful actions who are taking the state from the close over of the lambda. This is a little hacky/ugly. 
 To fix this we could have a callback/on_parse_done event. An example usage could be; 
@@ -36,3 +36,5 @@ Right now whole project is header only. Header only so far is fine but to avoid 
 # TODO 4: Configure CMAKE
 Configure CMAKE to ensure the library can be built as a library and can be installed via CMAKE. This should make adoptation of this to existing projects easier with less headache. 
 
+# TODO 5: Display help 
+Display help doesn't reflect the conventions right now. Also it should come automatically, and should be allowed to overriden by user.
