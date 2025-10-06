@@ -3,6 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <regex>
+#include <vector>
 
 using namespace argument_parser::conventions;
 
@@ -27,6 +28,42 @@ template<>
 struct argument_parser::parsing_traits::parser_trait<std::regex> {
     static std::regex parse(const std::string& input) {
         return std::regex(input);
+    }
+};
+
+template<>
+struct argument_parser::parsing_traits::parser_trait<std::vector<int>> {
+    static std::vector<int> parse(const std::string& input) {
+        std::vector<int> result;
+        std::stringstream ss(input);
+        std::string item;
+        while (std::getline(ss, item, ',')) {
+            result.push_back(std::stoi(item));
+        }
+        return result;
+    }
+};
+
+
+template<>
+struct argument_parser::parsing_traits::parser_trait<std::vector<std::string>> {
+    static std::vector<std::string> parse(const std::string& input) {
+        std::vector<std::string> result;
+        auto copyInput = input;
+        if (input.starts_with("[")) {
+            copyInput = input.substr(1, input.size());
+            if (copyInput.ends_with("]")) {
+                copyInput = copyInput.substr(0, copyInput.size() - 1);
+            } else {
+                throw std::runtime_error("Invalid vector<string> format. Expected closing ']'.");
+            }
+        }
+        std::stringstream ss(copyInput);
+        std::string item;
+        while (std::getline(ss, item, ',')) {
+            result.push_back(item);
+        }
+        return result;
     }
 };
 
@@ -91,6 +128,10 @@ int main() {
     }), false);
 
     parser.add_argument<Point>("p", "point", "Test point", false);
+
+    parser.add_argument<std::vector<int>>("t", "test", "Test vector<int>", false);
+    parser.add_argument<std::vector<std::string>>("ts", "test-strings", "Test vector<string>", false);
+
     parser.handle_arguments(conventions);
     
     auto filename = parser.get_optional<std::string>("file");
@@ -106,6 +147,22 @@ int main() {
         parser.display_help(conventions); 
         exit(-1); 
     }
+
+    auto test = parser.get_optional<std::vector<int>>("test");
+    if (test) {
+        for (auto const& item : test.value()) {
+            std::cout << item << std::endl;
+        }
+    }
+
+    auto test_strings = parser.get_optional<std::vector<std::string>>("test-strings");
+    if (test_strings) {
+        for (auto const& item : test_strings.value()) {
+            std::cout << item << std::endl;
+        }
+    }
+
+
     
     return 0; 
 }
