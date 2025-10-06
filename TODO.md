@@ -20,3 +20,10 @@ After handle_parse(...) ends, we can call the on_parse_done callbacks. But this 
 2. The on_parse_done callbacks should be called after all actions are invoked. But we should make this a toggle, so the callback only gets executed if the user explicitly wants it to be called. By default we would enable it. 
 
 ## Self reminder, implement this feature. It'd be helpful. 
+
+### Update: 6 Oct. 2025 
+We now have storable arguments. Now we need to implement the on_parse_done callbacks, to achieve this feature.
+
+# TODO 2: Positional arguments
+Positional arguments are arguments that are not prefixed with a dash. They are usually the arguments that are passed to the program. 
+For example, in the command `grep "pattern" file.txt`, "pattern" and "file.txt" are positional arguments.
