@@ -1,4 +1,6 @@
 #pragma once
+#include <optional>
+#include <type_traits>
 #ifndef ARGUMENT_PARSER_HPP
 #define ARGUMENT_PARSER_HPP
 
@@ -14,6 +16,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <any> 
 
 namespace argument_parser {
     class action_base {
@@ -129,6 +132,17 @@ namespace argument_parser {
         std::string help_text;
     };
 
+    namespace helpers {
+        template<typename T>
+        static parametered_action<T> make_parametered_action(std::function<void(const T&)> const& function) {
+            return parametered_action<T>(function);
+        }
+
+        static non_parametered_action make_non_parametered_action(std::function<void()> const& function) {
+            return non_parametered_action(function);
+        }
+    }
+
     class base_parser {
     public:
         template <typename T>
@@ -138,6 +152,22 @@ namespace argument_parser {
 
         void add_argument(std::string const& short_arg, std::string const& long_arg, std::string const& help_text, non_parametered_action const& action, bool required) {
             base_add_argument(short_arg, long_arg, help_text, action, required);
+        }
+
+        void add_argument(std::string const& short_arg, std::string const& long_arg, std::string const& help_text, bool required) {
+            base_add_argument<void>(short_arg, long_arg, help_text, required);
+        }
+        
+        template<typename T>
+        void add_argument(std::string const& short_arg, std::string const& long_arg, std::string const& help_text, bool required) {
+            base_add_argument<T>(short_arg, long_arg, help_text, required);
+        }
+
+        template<typename T>
+        std::optional<T> get_optional(std::string const& arg) {
+            auto id = find_argument_id(arg); 
+            if (id.has_value()) return std::any_cast<T>(stored_arguments[id.value()]);
+            return std::nullopt;
         }
 
         std::string build_help_text(std::initializer_list<conventions::convention const* const> convention_types) {
@@ -163,6 +193,15 @@ namespace argument_parser {
                 if (short_pos != short_arguments.end()) return argument_map.at(short_pos->second);
             }
             throw std::runtime_error("Unknown argument: " + arg.second);
+        }
+
+        std::optional<int> find_argument_id(std::string const& arg) {
+            auto long_pos = long_arguments.find(arg); 
+            auto short_post = short_arguments.find(arg); 
+
+            if (long_pos != long_arguments.end()) return long_pos->second;
+            if (short_post != short_arguments.end()) return short_post->second;
+            return std::nullopt;
         }
         
         void handle_arguments(std::initializer_list<conventions::convention const* const> convention_types) {
@@ -217,23 +256,49 @@ namespace argument_parser {
         std::vector<std::string> parsed_arguments;
 
     private:
-        template <typename ActionType>
-        void base_add_argument(std::string const& short_arg, std::string const& long_arg, std::string const& help_text, ActionType const& action, bool required) {
+        void assert_argument_not_exist(std::string const& short_arg, std::string const& long_arg) {
             if (short_arguments.count(short_arg) || long_arguments.count(long_arg)) {
                 throw std::runtime_error("The key already exists!");
             }
+        }
 
-            int id = id_counter.fetch_add(1);
-
-            argument arg(id, short_arg + "|" + long_arg, action);
-            arg.set_required(required);
+        void set_argument_status(bool is_required, std::string const& help_text, argument& arg) {
+            arg.set_required(is_required);
             arg.set_help_text(help_text);
-
+        }
+    
+        void place_argument(int id, argument const& arg, std::string const& short_arg, std::string const& long_arg) {
             argument_map[id] = arg;
             short_arguments[short_arg] = id;
             reverse_short_arguments[id] = short_arg;
             long_arguments[long_arg] = id;
             reverse_long_arguments[id] = long_arg;
+        }
+        
+        template <typename ActionType>
+        void base_add_argument(std::string const& short_arg, std::string const& long_arg, std::string const& help_text, ActionType const& action, bool required) {
+            assert_argument_not_exist(short_arg, long_arg);
+            int id = id_counter.fetch_add(1);
+            argument arg(id, short_arg + "|" + long_arg, action);
+            set_argument_status(required, help_text, arg);
+            place_argument(id, arg, short_arg, long_arg);
+        }
+
+        template<typename StoreType = void>
+        void base_add_argument(std::string const& short_arg, std::string const& long_arg, std::string const& help_text, bool required) {
+            assert_argument_not_exist(short_arg, long_arg);
+            int id = id_counter.fetch_add(1);
+            if constexpr (std::is_same_v<StoreType, void>) {
+                auto action = helpers::make_non_parametered_action([id, this] { stored_arguments[id] = std::any{ true }; });
+                argument arg(id, short_arg + "|" + long_arg, action);
+                set_argument_status(required, help_text, arg);
+                place_argument(id, arg, short_arg, long_arg);
+            } else {
+                auto action = helpers::make_parametered_action<StoreType>([id, this](StoreType const& value) { stored_arguments[id] = std::any{ value }; });
+                argument arg(id, short_arg + "|" + long_arg, action);
+                set_argument_status(required, help_text, arg);
+                place_argument(id, arg, short_arg, long_arg);
+            }
         }
 
         void check_for_required_arguments(std::initializer_list<conventions::convention const* const> convention_types) {
@@ -259,6 +324,7 @@ namespace argument_parser {
 
         inline static std::atomic_int id_counter = 0;
         
+        std::unordered_map<int, std::any> stored_arguments;
         std::unordered_map<int, argument> argument_map;
         std::unordered_map<std::string, int> short_arguments;
         std::unordered_map<int, std::string> reverse_short_arguments;
@@ -271,16 +337,7 @@ namespace argument_parser {
         friend class fake_parser;
     };
 
-    namespace helpers {
-        template<typename T>
-        static parametered_action<T> make_parametered_action(std::function<void(const T&)> const& function) {
-            return parametered_action<T>(function);
-        }
-
-        static non_parametered_action make_non_parametered_action(std::function<void()> const& function) {
-            return non_parametered_action(function);
-        }
-    }
+    
 }
 
 #endif // ARGUMENT_PARSER_HPP

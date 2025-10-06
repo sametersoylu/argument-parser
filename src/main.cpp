@@ -118,7 +118,16 @@ int main() {
         parser.display_help(conventions); 
     }), false);
 
+    parser.add_argument<std::string>("t", "test_store", "Test store", false); 
+
     parser.handle_arguments(conventions);
 
+    auto store = parser.get_optional<std::string>("test_store"); 
+    if (store.has_value()) {
+        std::cout << "Stored value: " << store.value() << std::endl;
+    } else {
+        std::cout << "No stored value." << std::endl;
+    }
+    
     return 0; 
 }
