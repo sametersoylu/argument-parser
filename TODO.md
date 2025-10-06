@@ -29,3 +29,10 @@ Also the run after complete events are implemented.
 # TODO 2: Positional arguments
 Positional arguments are arguments that are not prefixed with a dash. They are usually the arguments that are passed to the program. 
 For example, in the command `grep "pattern" file.txt`, "pattern" and "file.txt" are positional arguments.
+
+# TODO 3: Separate headers from implementations
+Right now whole project is header only. Header only so far is fine but to avoid issues later on, it's better if we separate them. 
+
+# TODO 4: Configure CMAKE
+Configure CMAKE to ensure the library can be built as a library and can be installed via CMAKE. This should make adoptation of this to existing projects easier with less headache. 
+
