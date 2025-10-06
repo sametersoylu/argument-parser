@@ -11,9 +11,8 @@ namespace argument_parser {
     class macos_parser : public base_parser {
         public: 
         macos_parser() {
-            int argc = *_NSGetArgc();
-            char **argv = *_NSGetArgv();
-            if (argc > 0 && argv != nullptr && argv[0] != nullptr) {
+            const int argc = *_NSGetArgc();
+            if (char **argv = *_NSGetArgv(); argc > 0 && argv != nullptr && argv[0] != nullptr) {
                 program_name = argv[0];
                 for (int i = 1; i < argc; ++i) {
                     if (argv[i] != nullptr) parsed_arguments.emplace_back(argv[i]);

@@ -8,7 +8,6 @@
 #include <traits.hpp>
 #include <base_convention.hpp>
 #include <atomic>
-#include <cstdlib>
 #include <functional>
 #include <initializer_list>
 #include <iostream>
@@ -16,17 +15,19 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
-#include <any> 
+#include <any>
+#include <ranges>
 
 namespace argument_parser {
     class action_base {
     public:
         virtual ~action_base() = default;
-        virtual bool expects_parameter() const = 0;
+        [[nodiscard]] virtual bool expects_parameter() const = 0;
         virtual void invoke() const = 0;
         virtual void invoke_with_parameter(const std::string& param) const = 0;
-        virtual std::unique_ptr<action_base> clone() const = 0;
+        [[nodiscard]] virtual std::unique_ptr<action_base> clone() const = 0;
     };
 
     template <typename T>
@@ -40,7 +41,7 @@ namespace argument_parser {
             handler(arg);
         }
 
-        bool expects_parameter() const override { return true; }
+        [[nodiscard]] bool expects_parameter() const override { return true; }
         
         void invoke() const override {
             throw std::runtime_error("Parametered action requires a parameter");
@@ -51,7 +52,7 @@ namespace argument_parser {
             invoke(parsed_value);
         }
         
-        std::unique_ptr<action_base> clone() const override {
+        [[nodiscard]] std::unique_ptr<action_base> clone() const override {
             return std::make_unique<parametered_action<T>>(handler);
         }
 
@@ -67,13 +68,13 @@ namespace argument_parser {
             handler();
         }
 
-        bool expects_parameter() const override { return false; }
+        [[nodiscard]] bool expects_parameter() const override { return false; }
         
         void invoke_with_parameter(const std::string& param) const override {
             invoke();
         }
         
-        std::unique_ptr<action_base> clone() const override {
+        [[nodiscard]] std::unique_ptr<action_base> clone() const override {
             return std::make_unique<non_parametered_action>(handler);
         }
 
@@ -85,11 +86,11 @@ namespace argument_parser {
 
     class argument {
     public:
-        argument() : id(0), name(), required(false), invoked(false), action(std::make_unique<non_parametered_action>([](){})) {}
+        argument() : id(0), name(), action(std::make_unique<non_parametered_action>([](){})), required(false), invoked(false) {}
 
         template <typename ActionType>
-        argument(int id, std::string const& name, ActionType const& action) 
-            : id(id), name(name), action(action.clone()), required(false), invoked(false) {}
+        argument(const int id, std::string name, ActionType const& action)
+            : id(id), name(std::move(name)), action(action.clone()), required(false), invoked(false) {}
 
         argument(const argument& other) 
             : id(other.id), name(other.name), action(other.action->clone()), 
@@ -110,11 +111,11 @@ namespace argument_parser {
         argument(argument&& other) noexcept = default;
         argument& operator=(argument&& other) noexcept = default;
 
-        bool is_required() const { return required; }
-        std::string get_name() const { return name; }
-        bool is_invoked() const { return invoked; }
+        [[nodiscard]] bool is_required() const { return required; }
+        [[nodiscard]] std::string get_name() const { return name; }
+        [[nodiscard]] bool is_invoked() const { return invoked; }
 
-        bool expects_parameter() const {
+        [[nodiscard]] bool expects_parameter() const {
             return action->expects_parameter();
         }
 
@@ -178,7 +179,7 @@ namespace argument_parser {
             return std::nullopt;
         }
 
-        std::string build_help_text(std::initializer_list<conventions::convention const* const> convention_types) const {
+        [[nodiscard]] std::string build_help_text(std::initializer_list<conventions::convention const* const> convention_types) const {
             std::stringstream ss;
             ss << "Usage: " << program_name << " [OPTIONS]...\n";
             
@@ -203,7 +204,7 @@ namespace argument_parser {
             throw std::runtime_error("Unknown argument: " + arg.second);
         }
 
-        std::optional<int> find_argument_id(std::string const& arg) const {
+        [[nodiscard]] std::optional<int> find_argument_id(std::string const& arg) const {
             auto long_pos = long_arguments.find(arg); 
             auto short_post = short_arguments.find(arg); 
 
@@ -265,13 +266,13 @@ namespace argument_parser {
         std::vector<std::string> parsed_arguments;
 
     private:
-        void assert_argument_not_exist(std::string const& short_arg, std::string const& long_arg) {
-            if (short_arguments.count(short_arg) || long_arguments.count(long_arg)) {
+        void assert_argument_not_exist(std::string const& short_arg, std::string const& long_arg) const {
+            if (short_arguments.contains(short_arg) || long_arguments.contains(long_arg)) {
                 throw std::runtime_error("The key already exists!");
             }
         }
 
-        void set_argument_status(bool is_required, std::string const& help_text, argument& arg) {
+        static void set_argument_status(bool is_required, std::string const& help_text, argument& arg) {
             arg.set_required(is_required);
             arg.set_help_text(help_text);
         }
@@ -312,7 +313,7 @@ namespace argument_parser {
 
         void check_for_required_arguments(std::initializer_list<conventions::convention const* const> convention_types) {
             std::vector<std::pair<std::string, std::string>> required_args; 
-            for (auto const& [_, arg] : argument_map) {
+            for (const auto &arg: argument_map | std::views::values) {
                 if (arg.is_required() and not arg.is_invoked()) {
                     required_args.emplace_back<std::pair<std::string, std::string>>({
                         reverse_short_arguments[arg.id],
@@ -331,7 +332,7 @@ namespace argument_parser {
             }
         }
 
-        void fire_on_complete_events() {
+        void fire_on_complete_events() const {
             for(auto const& event : on_complete_events) {
                 event(*this); 
             }

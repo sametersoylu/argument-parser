@@ -2,7 +2,7 @@
 #ifndef ARGPARSE_HPP
 #define ARGPARSE_HPP
 #include <argument_parser.hpp>
-#
+
 #ifdef __linux__
 #include <linux_parser.hpp>
 namespace argument_parser {
