@@ -1,4 +1,5 @@
 #pragma once
+#include <list>
 #include <optional>
 #include <type_traits>
 #ifndef ARGUMENT_PARSER_HPP
@@ -163,23 +164,27 @@ namespace argument_parser {
             base_add_argument<void>(short_arg, long_arg, help_text, required);
         }
 
+        void on_complete(std::function<void(base_parser const&)> const& action) {
+            on_complete_events.emplace_back(action); 
+        }
+
         template<typename T>
-        std::optional<T> get_optional(std::string const& arg) {
+        std::optional<T> get_optional(std::string const& arg) const {
             auto id = find_argument_id(arg); 
             if (id.has_value()) {
-                auto value =  stored_arguments[id.value()];
-                if (value.has_value()) return std::any_cast<T>(value);
+                auto value =  stored_arguments.find(id.value());
+                if (value != stored_arguments.end() && value->second.has_value()) return std::any_cast<T>(value->second);
             }
             return std::nullopt;
         }
 
-        std::string build_help_text(std::initializer_list<conventions::convention const* const> convention_types) {
+        std::string build_help_text(std::initializer_list<conventions::convention const* const> convention_types) const {
             std::stringstream ss;
             ss << "Usage: " << program_name << " [OPTIONS]...\n";
             
             for (auto const& [id, arg] : argument_map) {
-                auto short_arg = reverse_short_arguments[id];
-                auto long_arg = reverse_long_arguments[id];
+                auto short_arg = reverse_short_arguments.at(id);
+                auto long_arg = reverse_long_arguments.at(id);
                 ss << "\t";
                 ss << "-" << short_arg << ", --" << long_arg;
                 ss << "\t\t" << arg.help_text << "\n";
@@ -198,7 +203,7 @@ namespace argument_parser {
             throw std::runtime_error("Unknown argument: " + arg.second);
         }
 
-        std::optional<int> find_argument_id(std::string const& arg) {
+        std::optional<int> find_argument_id(std::string const& arg) const {
             auto long_pos = long_arguments.find(arg); 
             auto short_post = short_arguments.find(arg); 
 
@@ -246,9 +251,10 @@ namespace argument_parser {
                 }
             }
             check_for_required_arguments(convention_types);
+            fire_on_complete_events(); 
         }
 
-        void display_help(std::initializer_list<conventions::convention const* const> convention_types) {
+        void display_help(std::initializer_list<conventions::convention const* const> convention_types) const {
             std::cout << build_help_text(convention_types);
         }
 
@@ -325,6 +331,12 @@ namespace argument_parser {
             }
         }
 
+        void fire_on_complete_events() {
+            for(auto const& event : on_complete_events) {
+                event(*this); 
+            }
+        }
+
         inline static std::atomic_int id_counter = 0;
         
         std::unordered_map<int, std::any> stored_arguments;
@@ -333,6 +345,8 @@ namespace argument_parser {
         std::unordered_map<int, std::string> reverse_short_arguments;
         std::unordered_map<std::string, int> long_arguments;
         std::unordered_map<int, std::string> reverse_long_arguments;
+
+        std::list<std::function<void(base_parser const&)>> on_complete_events; 
 
         friend class linux_parser;
         friend class windows_parser;

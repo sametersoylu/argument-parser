@@ -1,3 +1,4 @@
+#include "argument_parser.hpp"
 #include <argparse>
 #include <cstdlib>
 #include <iostream>
@@ -94,7 +95,7 @@ const auto cat = argument_parser::helpers::make_parametered_action<std::string>(
     file.close();
 });
 
-auto grep(argument_parser::base_parser& parser, std::string const& filename, std::regex const& pattern) {
+auto grep(argument_parser::base_parser const& parser, std::string const& filename, std::regex const& pattern) {
     if (filename.empty()) {
         std::cerr << "Missing filename" << std::endl; 
         parser.display_help(conventions); 
@@ -115,6 +116,23 @@ auto grep(argument_parser::base_parser& parser, std::string const& filename, std
     file.close();
 }
 
+void run_grep(argument_parser::base_parser const& parser) {
+    auto filename = parser.get_optional<std::string>("file");
+    auto pattern = parser.get_optional<std::regex>("grep");
+
+    if (filename && pattern) {
+        grep(parser, filename.value(), pattern.value());
+    } else if (filename) {
+        std::cerr << "Missing grep pattern" << std::endl; 
+        parser.display_help(conventions); 
+        exit(-1); 
+    } else if (pattern) {
+        std::cerr << "Missing filename" << std::endl; 
+        parser.display_help(conventions); 
+        exit(-1); 
+    }
+}
+
 int main() {
     auto parser = argument_parser::parser{};
 
@@ -131,23 +149,9 @@ int main() {
 
     parser.add_argument<std::vector<int>>("t", "test", "Test vector<int>", false);
     parser.add_argument<std::vector<std::string>>("ts", "test-strings", "Test vector<string>", false);
-
+    parser.on_complete(::run_grep); 
     parser.handle_arguments(conventions);
-    
-    auto filename = parser.get_optional<std::string>("file");
-    auto pattern = parser.get_optional<std::regex>("grep");
-    if (filename && pattern) {
-        grep(parser, filename.value(), pattern.value());
-    } else if (filename) {
-        std::cerr << "Missing grep pattern" << std::endl; 
-        parser.display_help(conventions); 
-        exit(-1); 
-    } else if (pattern) {
-        std::cerr << "Missing filename" << std::endl; 
-        parser.display_help(conventions); 
-        exit(-1); 
-    }
-
+   
     auto test = parser.get_optional<std::vector<int>>("test");
     if (test) {
         for (auto const& item : test.value()) {
@@ -162,7 +166,5 @@ int main() {
         }
     }
 
-
-    
     return 0; 
 }

@@ -24,6 +24,8 @@ After handle_parse(...) ends, we can call the on_parse_done callbacks. But this 
 ### Update: 6 Oct. 2025 
 We now have storable arguments. Now we need to implement the on_parse_done callbacks, to achieve this feature.
 
+Also the run after complete events are implemented. 
+
 # TODO 2: Positional arguments
 Positional arguments are arguments that are not prefixed with a dash. They are usually the arguments that are passed to the program. 
 For example, in the command `grep "pattern" file.txt`, "pattern" and "file.txt" are positional arguments.
