@@ -3,6 +3,7 @@
 #define PARSING_TRAITS_HPP
 
 #include <string>
+#include <stdexcept>
 
 namespace argument_parser::parsing_traits {
     template <typename T_> 
