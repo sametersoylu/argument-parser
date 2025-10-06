@@ -2,6 +2,7 @@
 
 #ifdef __linux__
 #ifndef LINUX_PARSER_HPP
+#define LINUX_PARSER_HPP
 #include <fstream>
 #include <string>
 
