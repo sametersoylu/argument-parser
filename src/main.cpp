@@ -1,7 +1,10 @@
+#include "macos_parser.hpp"
+#include <string>
 #define ALLOW_DASH_FOR_WINDOWS 0
 
+#include <parser_v2.hpp>
 #include <argparse>
-#include <cstdlib>
+#include <expected>
 #include <iostream>
 #include <fstream>
 #include <regex>
@@ -135,7 +138,9 @@ void run_grep(argument_parser::base_parser const& parser) {
     }
 }
 
-int main() {
+
+int v1Examples() {
+
     auto parser = argument_parser::parser{};
 
     parser.add_argument("e", "echo", "echoes given variable", echo, false);
@@ -174,6 +179,55 @@ int main() {
             std::cout << item << std::endl;
         }
     }
-
     return 0; 
+}
+
+int v2Examples() {
+    using namespace argument_parser::v2::flags; 
+    argument_parser::v2::macos_parser  parser;
+
+    parser.add_argument<std::string>({
+        { ShortArgument, "e" },
+        { LongArgument, "echo" },
+        { Action, echo }
+    }); 
+
+    parser.add_argument<Point>({
+        { ShortArgument, "ep" },
+        { LongArgument, "echo-point" },
+        { Action, echo_point }
+    });
+
+    parser.add_argument<std::string>({ // stores string for f/file flag
+        { ShortArgument, "f" }, 
+        { LongArgument, "file"},
+        // if no action, falls to store operation with given type. 
+    }); 
+
+    parser.add_argument<std::regex>({ // stores string for g/grep flag
+        { ShortArgument, "g" }, 
+        { LongArgument, "grep" }, 
+        // same as 'file' flag
+    });
+
+    parser.add_argument<std::string>({
+        { ShortArgument, "c" }, 
+        { LongArgument, "cat" }, 
+        { Action, cat }
+    }); 
+
+    parser.add_argument<Point>({
+        // { ShortArgument, "sp" }, // now if ShortArgument or LongArgument is missing, it will use it for the other. 
+        { LongArgument, "store-point" },
+        { Required, true } // makes this flag required
+    }); 
+
+    parser.on_complete(::run_grep); 
+
+    parser.handle_arguments(conventions); 
+    return 0; 
+}
+
+int main() {
+    return v2Examples(); 
 }

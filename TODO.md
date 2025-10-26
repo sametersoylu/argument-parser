@@ -38,3 +38,13 @@ Configure CMAKE to ensure the library can be built as a library and can be insta
 
 # TODO 5: Display help 
 Display help doesn't reflect the conventions right now. Also it should come automatically, and should be allowed to overriden by user.
+
+# TODO 6: Accumulate repeated calls 
+Add support to letting users accumulate repeated calls to a flag. If the flag is called x times, the result should be x items stored in a vector, 
+instead of an action doing it. 
+
+# TODO 7: Defaults/Implicits
+If given, an arguments default store value could be changed. If nothing was given use that value instead.
+
+# TODO 8: Validators
+If given, validate the argument before passing to the storage or action. If fail, let user decide fail loud or fail skip. 
