@@ -359,9 +359,7 @@ namespace argument_parser {
         friend class windows_parser;
         friend class macos_parser;
         friend class fake_parser;
-    };
-
-    
+    }; 
 }
 
 #endif // ARGUMENT_PARSER_HPP

@@ -10,8 +10,10 @@
 namespace argument_parser {
     class fake_parser : public base_parser {
         public: 
-        fake_parser(std::string const& program_name, std::vector<std::string> const& arguments) {
-            this->program_name = program_name;
+        fake_parser() = default; 
+
+        fake_parser(std::string program_name, std::vector<std::string> const& arguments) {
+            this->program_name = std::move(program_name); 
             parsed_arguments = arguments;
         }
 
@@ -22,6 +24,14 @@ namespace argument_parser {
 
         fake_parser(std::string const& program_name, std::initializer_list<std::string> const& arguments) : 
             fake_parser(program_name, std::vector<std::string>(arguments)) {}
+
+        void set_program_name(std::string const& program_name) {
+            this->program_name = program_name; 
+        }
+
+        void set_parsed_arguments(std::vector<std::string> const& parsed_arguments) {
+            this->parsed_arguments = parsed_arguments; 
+        }
     }; 
 }
 
