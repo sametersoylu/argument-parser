@@ -1,6 +1,5 @@
 #pragma once
 #include "base_convention.hpp"
-#include <stdexcept>
 
 #ifndef WINDOWS_ARGUMENT_CONVENTION_HPP
 #define WINDOWS_ARGUMENT_CONVENTION_HPP
@@ -13,17 +12,11 @@ namespace argument_parser::conventions::implementations {
 	class windows_argument_convention : public base_convention {
 	public:
 		explicit windows_argument_convention(bool accept_dash = true);
-
 		parsed_argument get_argument(std::string const &raw) const override;
-
 		std::string extract_value(std::string const & /*raw*/) const override;
-
 		bool requires_next_token() const override;
-
 		std::string name() const override;
-
 		std::string short_prec() const override;
-
 		std::string long_prec() const override;
 		static windows_argument_convention instance;
 

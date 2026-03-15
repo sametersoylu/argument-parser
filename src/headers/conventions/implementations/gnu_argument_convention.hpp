@@ -10,15 +10,10 @@ namespace argument_parser::conventions::implementations {
 	public:
 		parsed_argument get_argument(std::string const &raw) const override;
 		std::string extract_value(std::string const & /*raw*/) const override;
-
 		bool requires_next_token() const override;
-
 		std::string name() const override;
-
 		std::string short_prec() const override;
-
 		std::string long_prec() const override;
-
 		static gnu_argument_convention instance;
 
 	private:

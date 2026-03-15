@@ -1,4 +1,5 @@
 #include "windows_argument_convention.hpp"
+#include <stdexcept>
 
 namespace argument_parser::conventions::implementations {
 	windows_argument_convention::windows_argument_convention(bool accept_dash) : accept_dash_(accept_dash) {}
