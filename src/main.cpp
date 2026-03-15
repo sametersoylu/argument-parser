@@ -1,4 +1,3 @@
-#include "macos_parser.hpp"
 #include <string>
 #define ALLOW_DASH_FOR_WINDOWS 0
 
@@ -8,7 +7,9 @@
 #include <iostream>
 #include <parser_v2.hpp>
 #include <regex>
+#include <sstream>
 #include <vector>
+
 
 struct Point {
 	int x, y;
@@ -35,7 +36,7 @@ template <> struct argument_parser::parsing_traits::parser_trait<std::regex> {
 template <> struct argument_parser::parsing_traits::parser_trait<std::vector<int>> {
 	static std::vector<int> parse(const std::string &input) {
 		std::vector<int> result;
-		std::stringstream ss(input);
+		std::stringstream ss{input};
 		std::string item;
 		while (std::getline(ss, item, ',')) {
 			result.push_back(std::stoi(item));
