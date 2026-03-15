@@ -27,6 +27,10 @@ namespace argument_parser {
 		return *this;
 	}
 
+	bool argument::expects_parameter() const {
+		return action->expects_parameter();
+	}
+
 	bool argument::is_required() const {
 		return required;
 	}
@@ -181,13 +185,13 @@ namespace argument_parser {
 		std::initializer_list<conventions::convention const *const> convention_types) {
 		std::vector<std::pair<std::string, std::string>> required_args;
 		for (auto const &[key, arg] : argument_map) {
-			if (arg.is_required() and not arg.is_invoked()) {
+			if (arg.is_required() && !arg.is_invoked()) {
 				required_args.emplace_back<std::pair<std::string, std::string>>(
 					{reverse_short_arguments[key], reverse_long_arguments[key]});
 			}
 		}
 
-		if (not required_args.empty()) {
+		if (!required_args.empty()) {
 			std::cerr << "These arguments were expected but not provided: ";
 			for (auto const &[s, l] : required_args) {
 				std::cerr << "[-" << s << ", --" << l << "] ";

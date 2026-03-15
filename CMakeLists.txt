@@ -16,4 +16,6 @@ include_directories(src/headers/conventions/implementations)
 include_directories(src/headers/parser/platform_headers)
 include_directories(src/headers/parser/parsing_traits)
 
-add_executable(test src/main.cpp)
+file(GLOB_RECURSE SRC_FILES "src/source/*.cpp" "src/source/**/*.cpp" "src/source/**/**/*.cpp")
+
+add_executable(test src/main.cpp ${SRC_FILES})

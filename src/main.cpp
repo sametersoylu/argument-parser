@@ -2,14 +2,12 @@
 #define ALLOW_DASH_FOR_WINDOWS 0
 
 #include <argparse>
-#include <expected>
 #include <fstream>
 #include <iostream>
 #include <parser_v2.hpp>
 #include <regex>
 #include <sstream>
 #include <vector>
-
 
 struct Point {
 	int x, y;
@@ -40,6 +38,18 @@ template <> struct argument_parser::parsing_traits::parser_trait<std::vector<int
 		std::string item;
 		while (std::getline(ss, item, ',')) {
 			result.push_back(std::stoi(item));
+		}
+		return result;
+	}
+};
+
+template <> struct argument_parser::parsing_traits::parser_trait<std::vector<std::string>> {
+	static std::vector<std::string> parse(const std::string &input) {
+		std::vector<std::string> result;
+		std::stringstream ss{input};
+		std::string item;
+		while (std::getline(ss, item, ',')) {
+			result.push_back(item);
 		}
 		return result;
 	}
@@ -154,14 +164,17 @@ int v2Examples() {
 	using namespace argument_parser::v2::flags;
 	argument_parser::v2::base_parser parser;
 
-	parser.add_argument<std::string>({{ShortArgument, "e"}, {LongArgument, "echo"}, {Action, echo}});
+	parser.add_argument<std::string>(
+		{{ShortArgument, "e"}, {LongArgument, "echo"}, {Action, echo}, {HelpText, "echoes given variable"}});
 
-	parser.add_argument<Point>({{ShortArgument, "ep"}, {LongArgument, "echo-point"}, {Action, echo_point}});
+	parser.add_argument<Point>(
+		{{ShortArgument, "ep"}, {LongArgument, "echo-point"}, {Action, echo_point}, {HelpText, "echoes given point"}});
 
 	parser.add_argument<std::string>({
 		// stores string for f/file flag
 		{ShortArgument, "f"},
 		{LongArgument, "file"},
+		{HelpText, "File to grep, required only if using grep"},
 		// if no action, falls to store operation with given type.
 	});
 
@@ -169,10 +182,12 @@ int v2Examples() {
 		// stores string for g/grep flag
 		{ShortArgument, "g"},
 		{LongArgument, "grep"},
+		{HelpText, "Grep pattern, required only if using file"},
 		// same as 'file' flag
 	});
 
-	parser.add_argument<std::string>({{ShortArgument, "c"}, {LongArgument, "cat"}, {Action, cat}});
+	parser.add_argument<std::string>(
+		{{ShortArgument, "c"}, {LongArgument, "cat"}, {Action, cat}, {HelpText, "Prints the content of the file"}});
 
 	parser.add_argument<Point>({
 		// { ShortArgument, "sp" }, // now if ShortArgument or LongArgument is missing, it will use it for the other.
