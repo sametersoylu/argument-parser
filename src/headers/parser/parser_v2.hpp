@@ -38,58 +38,7 @@ namespace argument_parser::v2 {
 
 		template <typename T>
 		void add_argument(std::unordered_map<add_argument_flags, typed_flag_value<T>> const &argument_pairs) {
-			std::unordered_map<extended_add_argument_flags, bool> found_params{
-				{extended_add_argument_flags::IsTyped, true}};
-
-			std::string short_arg, long_arg, help_text;
-			std::unique_ptr<action_base> action;
-			bool required = false;
-
-			if (argument_pairs.contains(add_argument_flags::ShortArgument)) {
-				found_params[extended_add_argument_flags::ShortArgument] = true;
-				short_arg = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::ShortArgument), "short");
-			}
-			if (argument_pairs.contains(add_argument_flags::LongArgument)) {
-				found_params[extended_add_argument_flags::LongArgument] = true;
-				long_arg = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::LongArgument), "long");
-				if (short_arg.empty())
-					short_arg = long_arg;
-			} else {
-				if (!short_arg.empty())
-					long_arg = short_arg;
-			}
-
-			if (argument_pairs.contains(add_argument_flags::Action)) {
-				found_params[extended_add_argument_flags::Action] = true;
-				action = get_or_throw<parametered_action<T>>(argument_pairs.at(add_argument_flags::Action), "action")
-							 .clone();
-			}
-			if (argument_pairs.contains(add_argument_flags::HelpText)) {
-				help_text = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::HelpText), "help");
-			} else {
-				help_text = short_arg + ", " + long_arg;
-			}
-			if (argument_pairs.contains(add_argument_flags::Required) &&
-				get_or_throw<bool>(argument_pairs.at(add_argument_flags::Required), "required")) {
-				required = true;
-			}
-
-			auto suggested_add = suggest_candidate(found_params);
-			if (suggested_add == candidate_type::unknown) {
-				throw std::runtime_error("Could not match any add argument overload to given parameters. Are you "
-										 "missing some required parameter?");
-			}
-			switch (suggested_add) {
-			case candidate_type::typed_action:
-				base::add_argument(short_arg, long_arg, help_text, *static_cast<parametered_action<T> *>(&(*action)),
-								   required);
-				break;
-			case candidate_type::store_other:
-				base::add_argument(short_arg, long_arg, help_text, required);
-				break;
-			default:
-				throw std::runtime_error("Could not match the arguments against any overload.");
-			}
+			add_argument_impl<true, parametered_action<T>>(argument_pairs);
 		}
 
 		template <typename T> void add_argument(std::initializer_list<typed_argument_pair<T>> const &pairs) {
@@ -113,61 +62,7 @@ namespace argument_parser::v2 {
 		}
 
 		void add_argument(std::unordered_map<add_argument_flags, non_typed_flag_value> const &argument_pairs) {
-			std::unordered_map<extended_add_argument_flags, bool> found_params{
-				{extended_add_argument_flags::IsTyped, false}};
-
-			std::string short_arg, long_arg, help_text;
-			std::unique_ptr<action_base> action;
-			bool required = false;
-
-			if (argument_pairs.find(add_argument_flags::ShortArgument) != argument_pairs.end()) {
-				found_params[extended_add_argument_flags::ShortArgument] = true;
-				short_arg = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::ShortArgument), "short");
-			}
-			if (argument_pairs.find(add_argument_flags::LongArgument) != argument_pairs.end()) {
-				found_params[extended_add_argument_flags::LongArgument] = true;
-				long_arg = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::LongArgument), "long");
-				if (short_arg.empty())
-					short_arg = long_arg;
-			} else {
-				if (!short_arg.empty())
-					long_arg = short_arg;
-			}
-			if (argument_pairs.find(add_argument_flags::Action) != argument_pairs.end()) {
-				found_params[extended_add_argument_flags::Action] = true;
-				action = get_or_throw<non_parametered_action>(argument_pairs.at(add_argument_flags::Action), "action")
-							 .clone();
-			}
-			if (argument_pairs.find(add_argument_flags::HelpText) != argument_pairs.end()) {
-				help_text = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::HelpText), "help");
-			} else {
-				help_text = short_arg + ", " + long_arg;
-			}
-
-			if (argument_pairs.find(add_argument_flags::Required) != argument_pairs.end() &&
-				get_or_throw<bool>(argument_pairs.at(add_argument_flags::Required), "required")) {
-				required = true;
-			}
-
-			auto suggested_add = suggest_candidate(found_params);
-			if (suggested_add == candidate_type::unknown) {
-				throw std::runtime_error("Could not match any add argument overload to given parameters. Are you "
-										 "missing some required parameter?");
-			}
-
-			switch (suggested_add) {
-			case candidate_type::non_typed_action:
-				base::add_argument(short_arg, long_arg, help_text, *static_cast<non_parametered_action *>(&(*action)),
-								   required);
-				break;
-			case candidate_type::store_boolean:
-				base::add_argument(short_arg, long_arg, help_text, required);
-				break;
-			default:
-				throw std::runtime_error(
-					"Could not match the arguments against any overload. The suggested candidate was: " +
-					std::to_string((int(suggested_add))));
-			}
+			add_argument_impl<false, non_parametered_action>(argument_pairs);
 		}
 
 		argument_parser::base_parser &to_v1() {
@@ -196,6 +91,79 @@ namespace argument_parser::v2 {
 		}
 
 	private:
+		template <bool IsTyped, typename ActionType, typename ArgsMap>
+		void add_argument_impl(ArgsMap const &argument_pairs) {
+			std::unordered_map<extended_add_argument_flags, bool> found_params{
+				{extended_add_argument_flags::IsTyped, IsTyped}};
+
+			std::string short_arg, long_arg, help_text;
+			std::unique_ptr<action_base> action;
+			bool required = false;
+
+			if (argument_pairs.find(add_argument_flags::ShortArgument) != argument_pairs.end()) {
+				found_params[extended_add_argument_flags::ShortArgument] = true;
+				short_arg = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::ShortArgument), "short");
+			}
+			if (argument_pairs.find(add_argument_flags::LongArgument) != argument_pairs.end()) {
+				found_params[extended_add_argument_flags::LongArgument] = true;
+				long_arg = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::LongArgument), "long");
+				if (short_arg.empty())
+					short_arg = long_arg;
+			} else {
+				if (!short_arg.empty())
+					long_arg = short_arg;
+			}
+
+			if (argument_pairs.find(add_argument_flags::Action) != argument_pairs.end()) {
+				found_params[extended_add_argument_flags::Action] = true;
+				action = get_or_throw<ActionType>(argument_pairs.at(add_argument_flags::Action), "action").clone();
+			}
+			if (argument_pairs.find(add_argument_flags::HelpText) != argument_pairs.end()) {
+				help_text = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::HelpText), "help");
+			} else {
+				help_text = short_arg + ", " + long_arg;
+			}
+
+			if (argument_pairs.find(add_argument_flags::Required) != argument_pairs.end() &&
+				get_or_throw<bool>(argument_pairs.at(add_argument_flags::Required), "required")) {
+				required = true;
+			}
+
+			auto suggested_add = suggest_candidate(found_params);
+			if (suggested_add == candidate_type::unknown) {
+				throw std::runtime_error("Could not match any add argument overload to given parameters. Are you "
+										 "missing some required parameter?");
+			}
+
+			if constexpr (IsTyped) {
+				switch (suggested_add) {
+				case candidate_type::typed_action:
+					base::add_argument(short_arg, long_arg, help_text, *static_cast<ActionType *>(&(*action)),
+									   required);
+					break;
+				case candidate_type::store_other:
+					base::add_argument(short_arg, long_arg, help_text, required);
+					break;
+				default:
+					throw std::runtime_error("Could not match the arguments against any overload.");
+				}
+			} else {
+				switch (suggested_add) {
+				case candidate_type::non_typed_action:
+					base::add_argument(short_arg, long_arg, help_text, *static_cast<ActionType *>(&(*action)),
+									   required);
+					break;
+				case candidate_type::store_boolean:
+					base::add_argument(short_arg, long_arg, help_text, required);
+					break;
+				default:
+					throw std::runtime_error(
+						"Could not match the arguments against any overload. The suggested candidate was: " +
+						std::to_string((int(suggested_add))));
+				}
+			}
+		}
+
 		using base = argument_parser::base_parser;
 		enum class extended_add_argument_flags { ShortArgument, LongArgument, Action, IsTyped };
 
