@@ -92,6 +92,16 @@ namespace argument_parser::v2 {
 		using argument_parser::base_parser::current_conventions;
 		using argument_parser::base_parser::reset_current_conventions;
 
+		void prepare_help_flag() {
+			add_argument({{flags::ShortArgument, "h"},
+						  {flags::LongArgument, "help"},
+						  {flags::Action, helpers::make_non_parametered_action([this]() {
+							   this->display_help(this->current_conventions());
+							   std::exit(0);
+						   })},
+						  {flags::HelpText, "Prints this help text."}});
+		}
+
 	private:
 		template <bool IsTyped, typename ActionType, typename T, typename ArgsMap>
 		void add_argument_impl(ArgsMap const &argument_pairs) {
