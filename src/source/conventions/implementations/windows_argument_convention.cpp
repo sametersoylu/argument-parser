@@ -50,27 +50,25 @@ namespace argument_parser::conventions::implementations {
 		return "/";
 	}
 
-	std::string windows_argument_convention::make_help_text(std::string const &short_arg, std::string const &long_arg,
+	std::pair<std::string, std::string> windows_argument_convention::make_help_text(std::string const &short_arg, std::string const &long_arg,
 															bool requires_value) const {
-		std::string res = "";
+		std::string s_part = "";
 		if (short_arg != "-" && short_arg != "") {
-			res += short_prec() + short_arg;
+			s_part += short_prec() + short_arg;
 			if (requires_value) {
-				res += " <value>";
+				s_part += " <value>";
 			}
 		}
 
+		std::string l_part = "";
 		if (long_arg != "-" && long_arg != "") {
-			if (!res.empty()) {
-				res += ", ";
-			}
-			res += long_prec() + long_arg;
+			l_part += long_prec() + long_arg;
 			if (requires_value) {
-				res += " <value>";
+				l_part += " <value>";
 			}
 		}
 
-		return res;
+		return {s_part, l_part};
 	}
 
 	std::vector<convention_features> windows_argument_convention::get_features() const {
@@ -130,30 +128,25 @@ namespace argument_parser::conventions::implementations {
 		return "/";
 	}
 
-	std::string windows_kv_argument_convention::make_help_text(std::string const &short_arg,
+	std::pair<std::string, std::string> windows_kv_argument_convention::make_help_text(std::string const &short_arg,
 															   std::string const &long_arg, bool requires_value) const {
-		std::string res = "";
+		std::string s_part = "";
 		if (short_arg != "-" && short_arg != "") {
-			res += short_prec() + short_arg;
+			s_part += short_prec() + short_arg;
 			if (requires_value) {
-				res += "=<value>";
-				res += ", " + short_prec() + short_arg;
-				res += ":<value>";
+				s_part += "=<value>, " + short_prec() + short_arg + ":<value>";
 			}
 		}
 
+		std::string l_part = "";
 		if (long_arg != "-" && long_arg != "") {
-			if (!res.empty()) {
-				res += ", ";
-			}
-			res += long_prec() + long_arg;
+			l_part += long_prec() + long_arg;
 			if (requires_value) {
-				res += "=<value>"
-					   ", " +
-					   long_prec() + long_arg + ":<value>";
+				l_part += "=<value>, " + long_prec() + long_arg + ":<value>";
 			}
 		}
-		return res;
+
+		return {s_part, l_part};
 	}
 
 	std::vector<convention_features> windows_kv_argument_convention::get_features() const {

@@ -1,4 +1,5 @@
 #pragma once
+#include "traits.hpp"
 #include <argument_parser.hpp>
 #include <array>
 #include <cstdlib>
@@ -103,6 +104,30 @@ namespace argument_parser::v2 {
 		}
 
 	private:
+		template <typename T> struct has_format_hint {
+		private:
+			typedef char YesType[1];
+			typedef char NoType[2];
+
+			template <typename C> static YesType &test(decltype(&C::format_hint));
+			template <typename> static NoType &test(...);
+
+		public:
+			static constexpr bool value = sizeof(test<T>(0)) == sizeof(YesType);
+		};
+
+		template <typename T> struct has_purpose_hint {
+		private:
+			typedef char YesType[1];
+			typedef char NoType[2];
+
+			template <typename C> static YesType &test(decltype(&C::purpose_hint));
+			template <typename> static NoType &test(...);
+
+		public:
+			static constexpr bool value = sizeof(test<T>(0)) == sizeof(YesType);
+		};
+
 		template <bool IsTyped, typename ActionType, typename T, typename ArgsMap>
 		void add_argument_impl(ArgsMap const &argument_pairs) {
 			std::unordered_map<extended_add_argument_flags, bool> found_params{
@@ -132,19 +157,6 @@ namespace argument_parser::v2 {
 			}
 			if (argument_pairs.find(add_argument_flags::HelpText) != argument_pairs.end()) {
 				help_text = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::HelpText), "help");
-			} else {
-				help_text = "";
-				if (short_arg != "-") {
-					help_text += short_arg;
-				}
-
-				if (long_arg != "-") {
-					if (!help_text.empty()) {
-						help_text += ", ";
-					}
-
-					help_text += long_arg;
-				}
 			}
 
 			if (argument_pairs.find(add_argument_flags::Required) != argument_pairs.end() &&
@@ -161,10 +173,34 @@ namespace argument_parser::v2 {
 			if constexpr (IsTyped) {
 				switch (suggested_add) {
 				case candidate_type::typed_action:
+					if (help_text.empty()) {
+						if constexpr (has_format_hint<parsing_traits::parser_trait<T>>::value &&
+									  has_purpose_hint<parsing_traits::parser_trait<T>>::value) {
+							auto format_hint = parsing_traits::parser_trait<T>::format_hint;
+							auto purpose_hint = parsing_traits::parser_trait<T>::purpose_hint;
+							help_text = "Triggers action with " + std::string(purpose_hint) + " (" +
+										std::string(format_hint) + ")";
+						} else {
+							help_text = "Triggers action with value.";
+						}
+					}
+
 					base::add_argument(short_arg, long_arg, help_text, *static_cast<ActionType *>(&(*action)),
 									   required);
 					break;
 				case candidate_type::store_other:
+					if (help_text.empty()) {
+						if constexpr (has_format_hint<parsing_traits::parser_trait<T>>::value &&
+									  has_purpose_hint<parsing_traits::parser_trait<T>>::value) {
+							auto format_hint = parsing_traits::parser_trait<T>::format_hint;
+							auto purpose_hint = parsing_traits::parser_trait<T>::purpose_hint;
+							help_text =
+								"Accepts " + std::string(purpose_hint) + " in " + std::string(format_hint) + " format.";
+						} else {
+							help_text = "Accepts value.";
+						}
+					}
+
 					base::add_argument<T>(short_arg, long_arg, help_text, required);
 					break;
 				default:
@@ -173,10 +209,21 @@ namespace argument_parser::v2 {
 			} else {
 				switch (suggested_add) {
 				case candidate_type::non_typed_action:
+					if (help_text.empty()) {
+						help_text = "Triggers action with no value.";
+					}
+
 					base::add_argument(short_arg, long_arg, help_text, *static_cast<ActionType *>(&(*action)),
 									   required);
 					break;
 				case candidate_type::store_boolean:
+					if (help_text.empty()) {
+						auto boolPurpose = parsing_traits::parser_trait<bool>::purpose_hint;
+						auto boolFormat = parsing_traits::parser_trait<bool>::format_hint;
+						help_text =
+							"Accepts " + std::string(boolPurpose) + " in " + std::string(boolFormat) + " format.";
+					}
+
 					base::add_argument(short_arg, long_arg, help_text, required);
 					break;
 				default:

@@ -1,6 +1,7 @@
 #include "argument_parser.hpp"
 
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -86,23 +87,56 @@ namespace argument_parser {
 		std::stringstream ss;
 		ss << "Usage: " << program_name << " [OPTIONS]...\n";
 
+		size_t max_short_len = 0;
+		size_t max_long_len = 0;
+
+		struct arg_help_info_t {
+			std::vector<std::pair<std::string, std::string>> convention_parts;
+			std::string desc;
+		};
+		std::vector<arg_help_info_t> help_lines;
+
 		for (auto const &[id, arg] : argument_map) {
 			auto short_arg =
 				reverse_short_arguments.find(id) != reverse_short_arguments.end() ? reverse_short_arguments.at(id) : "";
 			auto long_arg =
 				reverse_long_arguments.find(id) != reverse_long_arguments.end() ? reverse_long_arguments.at(id) : "";
 
-			ss << "\t";
+			std::vector<std::pair<std::string, std::string>> parts;
 			std::unordered_set<std::string> hasOnce;
 			for (auto const &convention : convention_types) {
-				auto generatedHelpText = convention->make_help_text(short_arg, long_arg, arg.expects_parameter());
-				if (hasOnce.find(generatedHelpText) == hasOnce.end()) {
-					ss << generatedHelpText << "\t";
-					hasOnce.insert(generatedHelpText);
+				auto generatedParts = convention->make_help_text(short_arg, long_arg, arg.expects_parameter());
+				std::string combined = generatedParts.first + "|" + generatedParts.second;
+				if (hasOnce.find(combined) == hasOnce.end()) {
+					parts.push_back(generatedParts);
+					hasOnce.insert(combined);
+
+					if (generatedParts.first.length() > max_short_len) {
+						max_short_len = generatedParts.first.length();
+					}
+					if (generatedParts.second.length() > max_long_len) {
+						max_long_len = generatedParts.second.length();
+					}
+				} else {
+					parts.push_back({"", ""}); // trigger empty space in the help text
 				}
 			}
-			ss << arg.help_text << "\n";
+			help_lines.push_back({parts, arg.help_text});
 		}
+
+		for (auto const &line : help_lines) {
+			ss << "\t";
+			for (size_t i = 0; i < line.convention_parts.size(); ++i) {
+				auto const &parts = line.convention_parts[i];
+				if (i > 0) {
+					ss << "  ";
+				}
+				ss << std::left << std::setw(static_cast<int>(max_short_len)) << parts.first << "  "
+				   << std::setw(static_cast<int>(max_long_len)) << parts.second;
+			}
+			ss << "\t" << line.desc << "\n";
+		}
+
 		return ss.str();
 	}
 
@@ -313,7 +347,18 @@ namespace argument_parser {
 			for (auto const &[s, l, p] : required_args) {
 				std::cerr << "\t" << get_one_name(s, l) << ": must be provided as one of [";
 				for (auto it = convention_types.begin(); it != convention_types.end(); ++it) {
-					std::cerr << (*it)->make_help_text(s, l, p);
+					auto generatedParts = (*it)->make_help_text(s, l, p);
+					std::string help_str = generatedParts.first;
+					if (!generatedParts.first.empty() && !generatedParts.second.empty()) {
+						help_str += "  ";
+					}
+					help_str += generatedParts.second;
+
+					size_t last_not_space = help_str.find_last_not_of(" \t");
+					if (last_not_space != std::string::npos) {
+						help_str.erase(last_not_space + 1);
+					}
+					std::cerr << help_str;
 					if (it + 1 != convention_types.end()) {
 						std::cerr << ", ";
 					}

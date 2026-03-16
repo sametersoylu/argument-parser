@@ -40,25 +40,26 @@ namespace argument_parser::conventions::implementations {
 		return {}; // no fallback allowed
 	}
 
-	std::string gnu_argument_convention::make_help_text(std::string const &short_arg, std::string const &long_arg,
-														bool requires_value) const {
-		std::string res = "";
+	std::pair<std::string, std::string> gnu_argument_convention::make_help_text(std::string const &short_arg,
+																				std::string const &long_arg,
+																				bool requires_value) const {
+		std::string s_part = "";
 		if (short_arg != "-" && short_arg != "") {
-			res += short_prec() + short_arg;
+			s_part += short_prec() + short_arg;
 			if (requires_value) {
-				res += " <value>";
+				s_part += " <value>";
 			}
 		}
+
+		std::string l_part = "";
 		if (long_arg != "-" && long_arg != "") {
-			if (!res.empty()) {
-				res += ", ";
-			}
-			res += long_prec() + long_arg;
+			l_part += long_prec() + long_arg;
 			if (requires_value) {
-				res += " <value>";
+				l_part += " <value>";
 			}
 		}
-		return res;
+
+		return {s_part, l_part};
 	}
 } // namespace argument_parser::conventions::implementations
 
@@ -97,26 +98,26 @@ namespace argument_parser::conventions::implementations {
 		return "--";
 	}
 
-	std::string gnu_equal_argument_convention::make_help_text(std::string const &short_arg, std::string const &long_arg,
-															  bool requires_value) const {
-		std::string res = "";
+	std::pair<std::string, std::string> gnu_equal_argument_convention::make_help_text(std::string const &short_arg,
+																					  std::string const &long_arg,
+																					  bool requires_value) const {
+		std::string s_part = "";
 		if (short_arg != "-" && short_arg != "") {
-			res += short_prec() + short_arg;
+			s_part += short_prec() + short_arg;
 			if (requires_value) {
-				res += "=<value>";
-			}
-		}
-		if (long_arg != "-" && long_arg != "") {
-			if (!res.empty()) {
-				res += ", ";
-			}
-			res += long_prec() + long_arg;
-			if (requires_value) {
-				res += "=<value>";
+				s_part += "=<value>";
 			}
 		}
 
-		return res;
+		std::string l_part = "";
+		if (long_arg != "-" && long_arg != "") {
+			l_part += long_prec() + long_arg;
+			if (requires_value) {
+				l_part += "=<value>";
+			}
+		}
+
+		return {s_part, l_part};
 	}
 
 	std::vector<convention_features> gnu_equal_argument_convention::get_features() const {
