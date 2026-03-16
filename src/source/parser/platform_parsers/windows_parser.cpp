@@ -42,15 +42,16 @@ std::string utf8_from_wstring(const std::wstring &w) {
 	if (w.empty())
 		return {};
 
-	int needed = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w.c_str(), -1, nullptr, 0, nullptr, nullptr);
+	int needed = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w.data(), static_cast<int>(w.size()), nullptr, 0,
+									   nullptr, nullptr);
 	if (needed <= 0) {
 		throw std::runtime_error("WideCharToMultiByte sizing failed ("s + windows_error_message(::GetLastError()) +
 								 ")");
 	}
 	std::string out;
 	out.resize(needed);
-	int written =
-		::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w.c_str(), -1, out.data(), out.size(), nullptr, nullptr);
+	int written = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, w.data(), static_cast<int>(w.size()), out.data(),
+										needed, nullptr, nullptr);
 	if (written <= 0) {
 		throw std::runtime_error(
 			"WideCharToMultiByte convert failed, Error("s + windows_error_message(::GetLastError()) + ")" +
