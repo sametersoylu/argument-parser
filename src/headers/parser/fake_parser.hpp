@@ -1,0 +1,23 @@
+#pragma once
+
+#ifndef FAKE_PARSER_HPP
+#define FAKE_PARSER_HPP
+
+#include <argument_parser.hpp>
+#include <initializer_list>
+#include <string>
+
+namespace argument_parser {
+	class fake_parser : public base_parser {
+	public:
+		fake_parser() = default;
+		fake_parser(std::string program_name, std::vector<std::string> const &arguments);
+		fake_parser(std::string const &program_name, std::vector<std::string> &&arguments);
+		fake_parser(std::string const &program_name, std::initializer_list<std::string> const &arguments);
+
+		void set_program_name(std::string const &program_name);
+		void set_parsed_arguments(std::vector<std::string> const &parsed_arguments);
+	};
+} // namespace argument_parser
+
+#endif
