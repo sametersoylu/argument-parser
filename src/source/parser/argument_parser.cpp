@@ -2,6 +2,18 @@
 
 #include <iostream>
 #include <sstream>
+#include <thread>
+
+class deferred_exec {
+public:
+	deferred_exec(std::function<void()> const &func) : func(func) {}
+	~deferred_exec() {
+		func();
+	}
+
+private:
+	std::function<void()> func;
+};
 
 bool contains(std::unordered_map<std::string, int> const &map, std::string const &key) {
 	return map.find(key) != map.end();
@@ -101,6 +113,13 @@ namespace argument_parser {
 	}
 
 	void base_parser::handle_arguments(std::initializer_list<conventions::convention const *const> convention_types) {
+		if (std::this_thread::get_id() != this->creation_thread_id.load()) {
+			throw std::runtime_error("handle_arguments must be called from the main thread");
+		}
+
+		deferred_exec reset_current_conventions([this]() { this->reset_current_conventions(); });
+		this->current_conventions(convention_types);
+
 		for (auto it = parsed_arguments.begin(); it != parsed_arguments.end(); ++it) {
 			std::stringstream error_stream;
 			bool arg_correctly_handled = false;

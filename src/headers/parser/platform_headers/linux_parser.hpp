@@ -17,6 +17,7 @@ namespace argument_parser {
 		class linux_parser : public v2::base_parser {
 		public:
 			linux_parser();
+			using base_parser::display_help;
 		};
 	} // namespace v2
 } // namespace argument_parser

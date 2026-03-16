@@ -1,6 +1,9 @@
+
 #ifdef _WIN32
 
 #include "windows_parser.hpp"
+#include "argument_parser.hpp"
+#include "parser_v2.hpp"
 
 #include <Windows.h>
 #include <iostream>
@@ -96,6 +99,14 @@ namespace argument_parser::v2 {
 	windows_parser::windows_parser() {
 		parse_windows_arguments(ref_parsed_args(),
 								[this](std::string const &program_name) { this->set_program_name(program_name); });
+
+		add_argument({{flags::ShortArgument, "h"},
+					  {flags::LongArgument, "help"},
+					  {flags::Action, helpers::make_non_parametered_action([this]() {
+						   this->display_help(this->current_conventions());
+						   std::exit(0);
+					   })},
+					  {flags::HelpText, "Prints this help text."}});
 	}
 } // namespace argument_parser::v2
 

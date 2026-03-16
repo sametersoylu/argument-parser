@@ -1,23 +1,72 @@
 #pragma once
-#include <list>
-#include <optional>
-#include <type_traits>
 #ifndef ARGUMENT_PARSER_HPP
 #define ARGUMENT_PARSER_HPP
+
 #include <any>
 #include <atomic>
 #include <base_convention.hpp>
 #include <functional>
 #include <initializer_list>
+#include <list>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <traits.hpp>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+
 namespace argument_parser {
+	namespace internal::atomic {
+		template <typename T> class copyable_atomic {
+		public:
+			copyable_atomic() : value(std::make_shared<std::atomic<T>>()) {}
+			copyable_atomic(T desired) : value(std::make_shared<std::atomic<T>>(desired)) {}
+
+			copyable_atomic(const copyable_atomic &other) : value(other.value) {}
+			copyable_atomic &operator=(const copyable_atomic &other) {
+				if (this != &other) {
+					value = other.value;
+				}
+				return *this;
+			}
+
+			copyable_atomic(copyable_atomic &&other) noexcept = default;
+			copyable_atomic &operator=(copyable_atomic &&other) noexcept = default;
+			~copyable_atomic() = default;
+
+			T operator=(T desired) noexcept {
+				store(desired);
+				return desired;
+			}
+
+			operator T() const noexcept {
+				return load();
+			}
+
+			void store(T desired, std::memory_order order = std::memory_order_seq_cst) noexcept {
+				if (value) {
+					value->store(desired, order);
+				}
+			}
+
+			T load(std::memory_order order = std::memory_order_seq_cst) const noexcept {
+				return value ? value->load(order) : T{};
+			}
+
+			T exchange(T desired, std::memory_order order = std::memory_order_seq_cst) noexcept {
+				return value ? value->exchange(desired, order) : T{};
+			}
+
+		private:
+			std::shared_ptr<std::atomic<T>> value;
+		};
+	} // namespace internal::atomic
+
 	class action_base {
 	public:
 		virtual ~action_base() = default;
@@ -127,6 +176,13 @@ namespace argument_parser {
 		}
 	} // namespace helpers
 
+	/**
+	 * @brief Base class for parsing arguments from the command line.
+	 *
+	 * Note: This class and its methods are NOT thread-safe.
+	 * It must be instantiated and used from a single thread (typically the main thread),
+	 * as operations such as argument processing and checking rely on thread-local or instance-specific state.
+	 */
 	class base_parser {
 	public:
 		template <typename T>
@@ -177,6 +233,18 @@ namespace argument_parser {
 		std::string program_name;
 		std::vector<std::string> parsed_arguments;
 
+		void reset_current_conventions() {
+			_current_conventions = {};
+		}
+
+		void current_conventions(std::initializer_list<conventions::convention const *const> convention_types) {
+			_current_conventions = convention_types;
+		}
+
+		[[nodiscard]] std::initializer_list<conventions::convention const *const> current_conventions() const {
+			return _current_conventions;
+		}
+
 	private:
 		void assert_argument_not_exist(std::string const &short_arg, std::string const &long_arg) const;
 		static void set_argument_status(bool is_required, std::string const &help_text, argument &arg);
@@ -223,6 +291,9 @@ namespace argument_parser {
 		std::unordered_map<int, std::string> reverse_short_arguments;
 		std::unordered_map<std::string, int> long_arguments;
 		std::unordered_map<int, std::string> reverse_long_arguments;
+
+		std::initializer_list<conventions::convention const *const> _current_conventions;
+		internal::atomic::copyable_atomic<std::thread::id> creation_thread_id = std::this_thread::get_id();
 
 		std::list<std::function<void(base_parser const &)>> on_complete_events;
 
