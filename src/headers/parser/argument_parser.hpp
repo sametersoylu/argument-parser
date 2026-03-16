@@ -4,7 +4,6 @@
 #include <type_traits>
 #ifndef ARGUMENT_PARSER_HPP
 #define ARGUMENT_PARSER_HPP
-
 #include <any>
 #include <atomic>
 #include <base_convention.hpp>
@@ -158,8 +157,9 @@ namespace argument_parser {
 			auto id = find_argument_id(arg);
 			if (id.has_value()) {
 				auto value = stored_arguments.find(id.value());
-				if (value != stored_arguments.end() && value->second.has_value())
+				if (value != stored_arguments.end() && value->second.has_value()) {
 					return std::any_cast<T>(value->second);
+				}
 			}
 			return std::nullopt;
 		}

@@ -115,7 +115,6 @@ namespace argument_parser {
 
 				try {
 					argument &corresponding_argument = get_argument(extracted);
-
 					if (corresponding_argument.expects_parameter()) {
 						if (convention_type->requires_next_token() && (it + 1) == parsed_arguments.end()) {
 							throw std::runtime_error("expected value for argument " + extracted.second);

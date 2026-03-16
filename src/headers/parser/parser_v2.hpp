@@ -38,7 +38,7 @@ namespace argument_parser::v2 {
 
 		template <typename T>
 		void add_argument(std::unordered_map<add_argument_flags, typed_flag_value<T>> const &argument_pairs) {
-			add_argument_impl<true, parametered_action<T>>(argument_pairs);
+			add_argument_impl<true, parametered_action<T>, T>(argument_pairs);
 		}
 
 		template <typename T> void add_argument(std::initializer_list<typed_argument_pair<T>> const &pairs) {
@@ -62,7 +62,7 @@ namespace argument_parser::v2 {
 		}
 
 		void add_argument(std::unordered_map<add_argument_flags, non_typed_flag_value> const &argument_pairs) {
-			add_argument_impl<false, non_parametered_action>(argument_pairs);
+			add_argument_impl<false, non_parametered_action, void>(argument_pairs);
 		}
 
 		argument_parser::base_parser &to_v1() {
@@ -91,7 +91,7 @@ namespace argument_parser::v2 {
 		}
 
 	private:
-		template <bool IsTyped, typename ActionType, typename ArgsMap>
+		template <bool IsTyped, typename ActionType, typename T, typename ArgsMap>
 		void add_argument_impl(ArgsMap const &argument_pairs) {
 			std::unordered_map<extended_add_argument_flags, bool> found_params{
 				{extended_add_argument_flags::IsTyped, IsTyped}};
@@ -142,7 +142,7 @@ namespace argument_parser::v2 {
 									   required);
 					break;
 				case candidate_type::store_other:
-					base::add_argument(short_arg, long_arg, help_text, required);
+					base::add_argument<T>(short_arg, long_arg, help_text, required);
 					break;
 				default:
 					throw std::runtime_error("Could not match the arguments against any overload.");

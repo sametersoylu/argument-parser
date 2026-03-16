@@ -160,9 +160,16 @@ int v1Examples() {
 	return 0;
 }
 
+void run_store_point(argument_parser::base_parser const &parser) {
+	auto point = parser.get_optional<Point>("store-point");
+	if (point) {
+		std::cout << "Point(" << point->x << ", " << point->y << ")" << std::endl;
+	}
+}
+
 int v2Examples() {
 	using namespace argument_parser::v2::flags;
-	argument_parser::v2::base_parser parser;
+	argument_parser::v2::parser parser;
 
 	parser.add_argument<std::string>(
 		{{ShortArgument, "e"}, {LongArgument, "echo"}, {Action, echo}, {HelpText, "echoes given variable"}});
@@ -196,11 +203,17 @@ int v2Examples() {
 	});
 
 	parser.on_complete(::run_grep);
+	parser.on_complete(::run_store_point);
 
 	parser.handle_arguments(conventions);
 	return 0;
 }
 
 int main() {
-	return v2Examples();
+	try {
+		return v2Examples();
+	} catch (std::exception const &e) {
+		std::cerr << "Error: " << e.what() << std::endl;
+		return -1;
+	}
 }

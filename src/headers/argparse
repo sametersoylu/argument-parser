@@ -8,14 +8,26 @@
 namespace argument_parser {
 	using parser = linux_parser;
 }
+
+namespace argument_parser::v2 {
+	using parser = linux_parser;
+}
 #elif __APPLE__
 #include <macos_parser.hpp>
 namespace argument_parser {
 	using parser = macos_parser;
 }
+
+namespace argument_parser::v2 {
+	using parser = macos_parser;
+}
 #elif _WIN32
 #include <windows_parser.hpp>
 namespace argument_parser {
+	using parser = windows_parser;
+}
+
+namespace argument_parser::v2 {
 	using parser = windows_parser;
 }
 #else
