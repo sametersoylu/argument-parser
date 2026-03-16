@@ -24,6 +24,14 @@ namespace argument_parser {
 						ref_parsed_args().emplace_back(argv[i]);
 				}
 			}
+
+			add_argument({{flags::ShortArgument, "h"},
+						  {flags::LongArgument, "help"},
+						  {flags::Action, helpers::make_non_parametered_action([this]() {
+							   this->display_help(this->current_conventions());
+							   std::exit(0);
+						   })},
+						  {flags::HelpText, "Prints this help text."}});
 		}
 	} // namespace v2
 } // namespace argument_parser
