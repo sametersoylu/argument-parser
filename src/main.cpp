@@ -118,48 +118,6 @@ void run_grep(argument_parser::base_parser const &parser) {
 	}
 }
 
-int v1Examples() {
-
-	auto parser = argument_parser::parser{};
-
-	parser.add_argument("e", "echo", "echoes given variable", echo, false);
-	parser.add_argument("ep", "echo-point", "echoes given point", echo_point, false);
-	parser.add_argument<std::string>("f", "file", "File to grep, required only if using grep", false);
-	parser.add_argument<std::regex>("g", "grep", "Grep pattern, required only if using grep", false);
-	parser.add_argument("c", "cat", "Prints the content of the file", cat, false);
-	parser.add_argument(
-		"h", "help", "Displays this help text.",
-		argument_parser::helpers::make_non_parametered_action([&parser] { parser.display_help(conventions); }), false);
-
-	parser.add_argument<Point>("p", "point", "Test point", false);
-
-	parser.add_argument<std::vector<int>>("t", "test", "Test vector<int>", false);
-	parser.add_argument<std::vector<std::string>>("ts", "test-strings", "Test vector<string>", false);
-	parser.on_complete(::run_grep);
-	try {
-		parser.handle_arguments(conventions);
-	} catch (std::exception const &e) {
-		std::cerr << "Error: " << e.what() << std::endl;
-		parser.display_help(conventions);
-		return -1;
-	}
-
-	auto test = parser.get_optional<std::vector<int>>("test");
-	if (test) {
-		for (auto const &item : test.value()) {
-			std::cout << item << std::endl;
-		}
-	}
-
-	auto test_strings = parser.get_optional<std::vector<std::string>>("test-strings");
-	if (test_strings) {
-		for (auto const &item : test_strings.value()) {
-			std::cout << item << std::endl;
-		}
-	}
-	return 0;
-}
-
 void run_store_point(argument_parser::base_parser const &parser) {
 	auto point = parser.get_optional<Point>("store-point");
 	if (point) {
