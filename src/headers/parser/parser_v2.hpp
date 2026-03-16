@@ -120,10 +120,10 @@ namespace argument_parser::v2 {
 				found_params[extended_add_argument_flags::LongArgument] = true;
 				long_arg = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::LongArgument), "long");
 				if (short_arg.empty())
-					short_arg = long_arg;
+					short_arg = "-";
 			} else {
 				if (!short_arg.empty())
-					long_arg = short_arg;
+					long_arg = "-";
 			}
 
 			if (argument_pairs.find(add_argument_flags::Action) != argument_pairs.end()) {
@@ -133,7 +133,18 @@ namespace argument_parser::v2 {
 			if (argument_pairs.find(add_argument_flags::HelpText) != argument_pairs.end()) {
 				help_text = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::HelpText), "help");
 			} else {
-				help_text = short_arg + ", " + long_arg;
+				help_text = "";
+				if (short_arg != "-") {
+					help_text += short_arg;
+				}
+
+				if (long_arg != "-") {
+					if (!help_text.empty()) {
+						help_text += ", ";
+					}
+
+					help_text += long_arg;
+				}
 			}
 
 			if (argument_pairs.find(add_argument_flags::Required) != argument_pairs.end() &&

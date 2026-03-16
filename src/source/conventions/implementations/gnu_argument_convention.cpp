@@ -35,6 +35,31 @@ namespace argument_parser::conventions::implementations {
 	std::string gnu_argument_convention::long_prec() const {
 		return "--";
 	}
+
+	std::vector<convention_features> gnu_argument_convention::get_features() const {
+		return {}; // no fallback allowed
+	}
+
+	std::string gnu_argument_convention::make_help_text(std::string const &short_arg, std::string const &long_arg,
+														bool requires_value) const {
+		std::string res = "";
+		if (short_arg != "-" && short_arg != "") {
+			res += short_prec() + short_arg;
+			if (requires_value) {
+				res += " <value>";
+			}
+		}
+		if (long_arg != "-" && long_arg != "") {
+			if (!res.empty()) {
+				res += ", ";
+			}
+			res += long_prec() + long_arg;
+			if (requires_value) {
+				res += " <value>";
+			}
+		}
+		return res;
+	}
 } // namespace argument_parser::conventions::implementations
 
 namespace argument_parser::conventions::implementations {
@@ -72,4 +97,29 @@ namespace argument_parser::conventions::implementations {
 		return "--";
 	}
 
+	std::string gnu_equal_argument_convention::make_help_text(std::string const &short_arg, std::string const &long_arg,
+															  bool requires_value) const {
+		std::string res = "";
+		if (short_arg != "-" && short_arg != "") {
+			res += short_prec() + short_arg;
+			if (requires_value) {
+				res += "=<value>";
+			}
+		}
+		if (long_arg != "-" && long_arg != "") {
+			if (!res.empty()) {
+				res += ", ";
+			}
+			res += long_prec() + long_arg;
+			if (requires_value) {
+				res += "=<value>";
+			}
+		}
+
+		return res;
+	}
+
+	std::vector<convention_features> gnu_equal_argument_convention::get_features() const {
+		return {}; // no fallback allowed
+	}
 } // namespace argument_parser::conventions::implementations

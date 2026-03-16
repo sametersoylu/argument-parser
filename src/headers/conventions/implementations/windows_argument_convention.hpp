@@ -18,6 +18,10 @@ namespace argument_parser::conventions::implementations {
 		std::string name() const override;
 		std::string short_prec() const override;
 		std::string long_prec() const override;
+		std::string make_help_text(std::string const &short_arg, std::string const &long_arg,
+								   bool requires_value) const override;
+		std::vector<convention_features> get_features() const override;
+
 		static windows_argument_convention instance;
 
 	private:
@@ -33,6 +37,10 @@ namespace argument_parser::conventions::implementations {
 		std::string name() const override;
 		std::string short_prec() const override;
 		std::string long_prec() const override;
+		std::string make_help_text(std::string const &short_arg, std::string const &long_arg,
+								   bool requires_value) const override;
+		std::vector<convention_features> get_features() const override;
+
 		static windows_kv_argument_convention instance;
 
 	private:

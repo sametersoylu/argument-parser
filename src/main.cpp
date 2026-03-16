@@ -4,7 +4,6 @@
 #include <argparse>
 #include <fstream>
 #include <iostream>
-#include <parser_v2.hpp>
 #include <regex>
 #include <sstream>
 #include <vector>
@@ -168,8 +167,9 @@ int v2Examples() {
 }
 
 int main() {
+	return v2Examples();
+
 	try {
-		return v2Examples();
 	} catch (std::exception const &e) {
 		std::cerr << "Error: " << e.what() << std::endl;
 		return -1;

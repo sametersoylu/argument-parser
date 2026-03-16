@@ -4,8 +4,10 @@
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class deferred_exec {
@@ -85,11 +87,19 @@ namespace argument_parser {
 		ss << "Usage: " << program_name << " [OPTIONS]...\n";
 
 		for (auto const &[id, arg] : argument_map) {
-			auto short_arg = reverse_short_arguments.at(id);
-			auto long_arg = reverse_long_arguments.at(id);
+			auto short_arg =
+				reverse_short_arguments.find(id) != reverse_short_arguments.end() ? reverse_short_arguments.at(id) : "";
+			auto long_arg =
+				reverse_long_arguments.find(id) != reverse_long_arguments.end() ? reverse_long_arguments.at(id) : "";
+
 			ss << "\t";
+			std::unordered_set<std::string> hasOnce;
 			for (auto const &convention : convention_types) {
-				ss << convention->short_prec() << short_arg << ", " << convention->long_prec() << long_arg << "\t";
+				auto generatedHelpText = convention->make_help_text(short_arg, long_arg, arg.expects_parameter());
+				if (hasOnce.find(generatedHelpText) == hasOnce.end()) {
+					ss << generatedHelpText << "\t";
+					hasOnce.insert(generatedHelpText);
+				}
 			}
 			ss << arg.help_text << "\n";
 		}
@@ -143,20 +153,19 @@ namespace argument_parser {
 
 				if (extracted.second == "h" || extracted.second == "help") {
 					found_help = corresponding_argument;
-					continue;
+					return true;
 				}
 
 				found_arguments.emplace_back(extracted.second, corresponding_argument);
 
 				if (corresponding_argument.expects_parameter()) {
 					if (convention_type->requires_next_token() && (it + 1) == parsed_arguments.end()) {
-						throw std::runtime_error("expected value for argument " + extracted.second);
+						throw std::runtime_error("Expected value for argument " + extracted.second);
 					}
 					values_for_arguments[extracted.second] =
 						convention_type->requires_next_token() ? *(++it) : convention_type->extract_value(*it);
 				}
 
-				corresponding_argument.set_invoked(true);
 				return true;
 			} catch (const std::runtime_error &e) {
 				error_stream << "Convention \"" << convention_type->name() << "\" failed with: " << e.what() << "\n";
@@ -183,7 +192,7 @@ namespace argument_parser {
 	}
 
 	void base_parser::invoke_arguments(std::unordered_map<std::string, std::string> const &values_for_arguments,
-									   std::vector<std::pair<std::string, argument>> const &found_arguments,
+									   std::vector<std::pair<std::string, argument>> &found_arguments,
 									   std::optional<argument> const &found_help) {
 
 		if (found_help) {
@@ -192,13 +201,14 @@ namespace argument_parser {
 		}
 
 		std::stringstream error_stream;
-		for (auto const &[key, value] : found_arguments) {
+		for (auto &[key, value] : found_arguments) {
 			try {
 				if (value.expects_parameter()) {
 					value.action->invoke_with_parameter(values_for_arguments.at(key));
 				} else {
 					value.action->invoke();
 				}
+				value.set_invoked(true);
 			} catch (const std::runtime_error &e) {
 				error_stream << "Argument " << key << " failed with: " << e.what() << "\n";
 			}
@@ -255,26 +265,60 @@ namespace argument_parser {
 	void base_parser::place_argument(int id, argument const &arg, std::string const &short_arg,
 									 std::string const &long_arg) {
 		argument_map[id] = arg;
-		short_arguments[short_arg] = id;
-		reverse_short_arguments[id] = short_arg;
-		long_arguments[long_arg] = id;
-		reverse_long_arguments[id] = long_arg;
+		if (short_arg != "-") {
+			short_arguments[short_arg] = id;
+			reverse_short_arguments[id] = short_arg;
+		}
+		if (long_arg != "-") {
+			long_arguments[long_arg] = id;
+			reverse_long_arguments[id] = long_arg;
+		}
+	}
+
+	std::string get_one_name(std::string const &short_name, std::string const &long_name) {
+		std::string res{};
+		if (short_name != "-") {
+			res += short_name;
+		}
+
+		if (long_name != "-") {
+			if (!res.empty()) {
+				res += ", ";
+			}
+
+			res += long_name;
+		}
+		return res;
 	}
 
 	void base_parser::check_for_required_arguments(
 		std::initializer_list<conventions::convention const *const> convention_types) {
-		std::vector<std::pair<std::string, std::string>> required_args;
+		std::vector<std::tuple<std::string, std::string, bool>> required_args;
 		for (auto const &[key, arg] : argument_map) {
 			if (arg.is_required() && !arg.is_invoked()) {
-				required_args.emplace_back<std::pair<std::string, std::string>>(
-					{reverse_short_arguments[key], reverse_long_arguments[key]});
+				auto short_arg = reverse_short_arguments.find(key) != reverse_short_arguments.end()
+									 ? reverse_short_arguments.at(key)
+									 : "-";
+				auto long_arg = reverse_long_arguments.find(key) != reverse_long_arguments.end()
+									? reverse_long_arguments.at(key)
+									: "-";
+
+				required_args.emplace_back<std::tuple<std::string, std::string, bool>>(
+					{short_arg, long_arg, arg.expects_parameter()});
 			}
 		}
 
 		if (!required_args.empty()) {
-			std::cerr << "These arguments were expected but not provided: ";
-			for (auto const &[s, l] : required_args) {
-				std::cerr << "[-" << s << ", --" << l << "] ";
+			std::cerr << "These arguments were expected but not provided: \n";
+			for (auto const &[s, l, p] : required_args) {
+				std::cerr << "\t" << get_one_name(s, l) << ": must be provided as one of [";
+				for (auto it = convention_types.begin(); it != convention_types.end(); ++it) {
+					std::cerr << (*it)->make_help_text(s, l, p);
+					if (it + 1 != convention_types.end()) {
+						std::cerr << ", ";
+					}
+				}
+				std::cerr << "]\n";
 			}
 			std::cerr << "\n";
 			display_help(convention_types);
