@@ -15,10 +15,6 @@
 #include <vector>
 
 namespace argument_parser::v2 {
-	namespace internal {
-		static inline fake_parser fake_parser{};
-	}
-
 	enum class add_argument_flags { ShortArgument, LongArgument, HelpText, Action, Required };
 
 	namespace flags {
@@ -104,30 +100,6 @@ namespace argument_parser::v2 {
 		}
 
 	private:
-		template <typename T> struct has_format_hint {
-		private:
-			typedef char YesType[1];
-			typedef char NoType[2];
-
-			template <typename C> static YesType &test(decltype(&C::format_hint));
-			template <typename> static NoType &test(...);
-
-		public:
-			static constexpr bool value = sizeof(test<T>(0)) == sizeof(YesType);
-		};
-
-		template <typename T> struct has_purpose_hint {
-		private:
-			typedef char YesType[1];
-			typedef char NoType[2];
-
-			template <typename C> static YesType &test(decltype(&C::purpose_hint));
-			template <typename> static NoType &test(...);
-
-		public:
-			static constexpr bool value = sizeof(test<T>(0)) == sizeof(YesType);
-		};
-
 		template <bool IsTyped, typename ActionType, typename T, typename ArgsMap>
 		void add_argument_impl(ArgsMap const &argument_pairs) {
 			std::unordered_map<extended_add_argument_flags, bool> found_params{
@@ -174,8 +146,8 @@ namespace argument_parser::v2 {
 				switch (suggested_add) {
 				case candidate_type::typed_action:
 					if (help_text.empty()) {
-						if constexpr (has_format_hint<parsing_traits::parser_trait<T>>::value &&
-									  has_purpose_hint<parsing_traits::parser_trait<T>>::value) {
+						if constexpr (internal::sfinae::has_format_hint<parsing_traits::parser_trait<T>>::value &&
+									  internal::sfinae::has_purpose_hint<parsing_traits::parser_trait<T>>::value) {
 							auto format_hint = parsing_traits::parser_trait<T>::format_hint;
 							auto purpose_hint = parsing_traits::parser_trait<T>::purpose_hint;
 							help_text = "Triggers action with " + std::string(purpose_hint) + " (" +
@@ -190,8 +162,8 @@ namespace argument_parser::v2 {
 					break;
 				case candidate_type::store_other:
 					if (help_text.empty()) {
-						if constexpr (has_format_hint<parsing_traits::parser_trait<T>>::value &&
-									  has_purpose_hint<parsing_traits::parser_trait<T>>::value) {
+						if constexpr (internal::sfinae::has_format_hint<parsing_traits::parser_trait<T>>::value &&
+									  internal::sfinae::has_purpose_hint<parsing_traits::parser_trait<T>>::value) {
 							auto format_hint = parsing_traits::parser_trait<T>::format_hint;
 							auto purpose_hint = parsing_traits::parser_trait<T>::purpose_hint;
 							help_text =

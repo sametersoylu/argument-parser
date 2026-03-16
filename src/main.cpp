@@ -1,6 +1,5 @@
-#include "headers/parser/parsing_traits/traits.hpp"
+#include <exception>
 #include <string>
-#define ALLOW_DASH_FOR_WINDOWS 0
 
 #include <argparse>
 #include <fstream>
@@ -24,7 +23,7 @@ template <> struct argument_parser::parsing_traits::parser_trait<Point> {
 		return {x, y};
 	}
 	static constexpr argument_parser::parsing_traits::hint_type format_hint = "x,y";
-	static constexpr argument_parser::parsing_traits::hint_type purpose_hint = "point coordinates";
+	static constexpr argument_parser::parsing_traits::hint_type purpose_hint = "coordinates";
 };
 
 template <> struct argument_parser::parsing_traits::parser_trait<std::regex> {
@@ -178,11 +177,9 @@ int v2Examples() {
 }
 
 int main() {
-	return v2Examples();
-
 	try {
+		return v2Examples();
 	} catch (std::exception const &e) {
-		std::cerr << "Error: " << e.what() << std::endl;
-		return -1;
+		std::cout << e.what() << std::endl;
 	}
 }

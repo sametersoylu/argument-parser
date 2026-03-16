@@ -20,6 +20,32 @@
 #include <vector>
 
 namespace argument_parser {
+	namespace internal::sfinae {
+		template <typename T> struct has_format_hint {
+		private:
+			typedef char YesType[1];
+			typedef char NoType[2];
+
+			template <typename C> static YesType &test(decltype(&C::format_hint));
+			template <typename> static NoType &test(...);
+
+		public:
+			static constexpr bool value = sizeof(test<T>(0)) == sizeof(YesType);
+		};
+
+		template <typename T> struct has_purpose_hint {
+		private:
+			typedef char YesType[1];
+			typedef char NoType[2];
+
+			template <typename C> static YesType &test(decltype(&C::purpose_hint));
+			template <typename> static NoType &test(...);
+
+		public:
+			static constexpr bool value = sizeof(test<T>(0)) == sizeof(YesType);
+		};
+	} // namespace internal::sfinae
+
 	namespace internal::atomic {
 		template <typename T> class copyable_atomic {
 		public:
@@ -72,6 +98,7 @@ namespace argument_parser {
 		[[nodiscard]] virtual bool expects_parameter() const = 0;
 		virtual void invoke() const = 0;
 		virtual void invoke_with_parameter(const std::string &param) const = 0;
+		[[nodiscard]] virtual std::pair<std::string, std::string> get_trait_hints() const = 0;
 		[[nodiscard]] virtual std::unique_ptr<action_base> clone() const = 0;
 	};
 
@@ -92,8 +119,31 @@ namespace argument_parser {
 		}
 
 		void invoke_with_parameter(const std::string &param) const override {
-			T parsed_value = parsing_traits::parser_trait<T>::parse(param);
-			invoke(parsed_value);
+			bool parse_success = false;
+			try {
+				T parsed_value = parsing_traits::parser_trait<T>::parse(param);
+				parse_success = true;
+				invoke(parsed_value);
+			} catch (const std::runtime_error &e) {
+				if (!parse_success) {
+					auto [format_hint, purpose_hint] = get_trait_hints();
+					if (purpose_hint.empty())
+						purpose_hint = "value";
+					std::string error_text{"'" + param + "' is not a valid " + purpose_hint + " ${KEY}"};
+					if (!format_hint.empty())
+						error_text += "\nExpected format: " + format_hint;
+					throw std::runtime_error(error_text);
+				}
+			}
+		}
+
+		[[nodiscard]] std::pair<std::string, std::string> get_trait_hints() const override {
+			if constexpr (internal::sfinae::has_format_hint<parsing_traits::parser_trait<T>>::value &&
+						  internal::sfinae::has_purpose_hint<parsing_traits::parser_trait<T>>::value) {
+				return {parsing_traits::parser_trait<T>::format_hint, parsing_traits::parser_trait<T>::purpose_hint};
+			} else {
+				return {"", "value"};
+			}
 		}
 
 		[[nodiscard]] std::unique_ptr<action_base> clone() const override {
@@ -118,6 +168,10 @@ namespace argument_parser {
 
 		void invoke_with_parameter(const std::string &param) const override {
 			invoke();
+		}
+
+		[[nodiscard]] std::pair<std::string, std::string> get_trait_hints() const override {
+			return {"", ""};
 		}
 
 		[[nodiscard]] std::unique_ptr<action_base> clone() const override {

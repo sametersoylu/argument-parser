@@ -225,6 +225,17 @@ namespace argument_parser {
 		}
 	}
 
+	std::string replace_var(std::string text, const std::string &var_name, const std::string &value) {
+		std::string placeholder = "${" + var_name + "}";
+		size_t pos = text.find(placeholder);
+
+		while (pos != std::string::npos) {
+			text.replace(pos, placeholder.length(), value);
+			pos = text.find(placeholder, pos + value.length());
+		}
+		return text;
+	}
+
 	void base_parser::invoke_arguments(std::unordered_map<std::string, std::string> const &values_for_arguments,
 									   std::vector<std::pair<std::string, argument>> &found_arguments,
 									   std::optional<argument> const &found_help) {
@@ -244,7 +255,9 @@ namespace argument_parser {
 				}
 				value.set_invoked(true);
 			} catch (const std::runtime_error &e) {
-				error_stream << "Argument " << key << " failed with: " << e.what() << "\n";
+				std::string err{e.what()};
+				err = replace_var(err, "KEY", "for " + key);
+				error_stream << "Error: " << err << "\n";
 			}
 		}
 
@@ -367,6 +380,7 @@ namespace argument_parser {
 			}
 			std::cerr << "\n";
 			display_help(convention_types);
+			std::exit(1);
 		}
 	}
 
