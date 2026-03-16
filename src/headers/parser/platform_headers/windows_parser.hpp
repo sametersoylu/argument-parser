@@ -13,6 +13,7 @@ namespace argument_parser {
 		class windows_parser : public v2::base_parser {
 		public:
 			windows_parser();
+			using base_parser::display_help;
 		};
 	} // namespace v2
 } // namespace argument_parser

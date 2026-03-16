@@ -77,9 +77,8 @@ namespace argument_parser::v2 {
 			return base::get_optional<T>(arg);
 		}
 
-		void on_complete(std::function<void(argument_parser::base_parser const &)> const &action) {
-			base::on_complete(action);
-		}
+		using argument_parser::base_parser::display_help;
+		using argument_parser::base_parser::on_complete;
 
 	protected:
 		void set_program_name(std::string p) {
@@ -89,6 +88,9 @@ namespace argument_parser::v2 {
 		std::vector<std::string> &ref_parsed_args() {
 			return base::parsed_arguments;
 		}
+
+		using argument_parser::base_parser::current_conventions;
+		using argument_parser::base_parser::reset_current_conventions;
 
 	private:
 		template <bool IsTyped, typename ActionType, typename T, typename ArgsMap>
