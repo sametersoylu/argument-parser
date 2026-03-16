@@ -19,7 +19,6 @@
 #include <utility>
 #include <vector>
 
-
 namespace argument_parser {
 	namespace internal::atomic {
 		template <typename T> class copyable_atomic {
@@ -246,6 +245,21 @@ namespace argument_parser {
 		}
 
 	private:
+		bool test_conventions(std::initializer_list<conventions::convention const *const> convention_types,
+							  std::unordered_map<std::string, std::string> &values_for_arguments,
+							  std::vector<std::pair<std::string, argument>> &found_arguments,
+							  std::optional<argument> &found_help, std::vector<std::string>::iterator it,
+							  std::stringstream &error_stream);
+		void extract_arguments(std::initializer_list<conventions::convention const *const> convention_types,
+							   std::unordered_map<std::string, std::string> &values_for_arguments,
+							   std::vector<std::pair<std::string, argument>> &found_arguments,
+							   std::optional<argument> &found_help);
+
+		void invoke_arguments(std::unordered_map<std::string, std::string> const &values_for_arguments,
+							  std::vector<std::pair<std::string, argument>> const &found_arguments,
+							  std::optional<argument> const &found_help);
+		void enforce_creation_thread();
+
 		void assert_argument_not_exist(std::string const &short_arg, std::string const &long_arg) const;
 		static void set_argument_status(bool is_required, std::string const &help_text, argument &arg);
 		void place_argument(int id, argument const &arg, std::string const &short_arg, std::string const &long_arg);

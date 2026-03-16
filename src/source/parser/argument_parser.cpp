@@ -1,8 +1,12 @@
 #include "argument_parser.hpp"
 
+#include <functional>
 #include <iostream>
+#include <optional>
 #include <sstream>
 #include <thread>
+#include <unordered_map>
+#include <vector>
 
 class deferred_exec {
 public:
@@ -112,54 +116,112 @@ namespace argument_parser {
 		throw std::runtime_error("Unknown argument: " + arg.second);
 	}
 
-	void base_parser::handle_arguments(std::initializer_list<conventions::convention const *const> convention_types) {
+	void base_parser::enforce_creation_thread() {
 		if (std::this_thread::get_id() != this->creation_thread_id.load()) {
 			throw std::runtime_error("handle_arguments must be called from the main thread");
 		}
+	}
 
-		deferred_exec reset_current_conventions([this]() { this->reset_current_conventions(); });
-		this->current_conventions(convention_types);
+	bool base_parser::test_conventions(std::initializer_list<conventions::convention const *const> convention_types,
+									   std::unordered_map<std::string, std::string> &values_for_arguments,
+									   std::vector<std::pair<std::string, argument>> &found_arguments,
+									   std::optional<argument> &found_help, std::vector<std::string>::iterator it,
+									   std::stringstream &error_stream) {
 
-		for (auto it = parsed_arguments.begin(); it != parsed_arguments.end(); ++it) {
-			std::stringstream error_stream;
-			bool arg_correctly_handled = false;
+		std::string current_argument = *it;
 
-			for (auto const &convention_type : convention_types) {
-				auto extracted = convention_type->get_argument(*it);
-				if (extracted.first == conventions::argument_type::ERROR) {
-					error_stream << "Convention \"" << convention_type->name() << "\" failed with: " << extracted.second
-								 << "\n";
+		for (auto const &convention_type : convention_types) {
+			auto extracted = convention_type->get_argument(current_argument);
+			if (extracted.first == conventions::argument_type::ERROR) {
+				error_stream << "Convention \"" << convention_type->name() << "\" failed with: " << extracted.second
+							 << "\n";
+				continue;
+			}
+
+			try {
+				argument &corresponding_argument = get_argument(extracted);
+
+				if (extracted.second == "h" || extracted.second == "help") {
+					found_help = corresponding_argument;
 					continue;
 				}
 
-				try {
-					argument &corresponding_argument = get_argument(extracted);
-					if (corresponding_argument.expects_parameter()) {
-						if (convention_type->requires_next_token() && (it + 1) == parsed_arguments.end()) {
-							throw std::runtime_error("expected value for argument " + extracted.second);
-						}
-						auto value_raw =
-							convention_type->requires_next_token() ? *(++it) : convention_type->extract_value(*it);
-						corresponding_argument.action->invoke_with_parameter(value_raw);
-					} else {
-						corresponding_argument.action->invoke();
+				found_arguments.emplace_back(extracted.second, corresponding_argument);
+
+				if (corresponding_argument.expects_parameter()) {
+					if (convention_type->requires_next_token() && (it + 1) == parsed_arguments.end()) {
+						throw std::runtime_error("expected value for argument " + extracted.second);
 					}
-
-					corresponding_argument.set_invoked(true);
-					arg_correctly_handled = true;
-					break; // Convention succeeded, move to the next argument token
-
-				} catch (const std::runtime_error &e) {
-					error_stream << "Convention \"" << convention_type->name() << "\" failed with: " << e.what()
-								 << "\n";
+					values_for_arguments[extracted.second] =
+						convention_type->requires_next_token() ? *(++it) : convention_type->extract_value(*it);
 				}
-			}
 
-			if (!arg_correctly_handled) {
+				corresponding_argument.set_invoked(true);
+				return true;
+			} catch (const std::runtime_error &e) {
+				error_stream << "Convention \"" << convention_type->name() << "\" failed with: " << e.what() << "\n";
+			}
+		}
+
+		return false;
+	}
+
+	void base_parser::extract_arguments(std::initializer_list<conventions::convention const *const> convention_types,
+										std::unordered_map<std::string, std::string> &values_for_arguments,
+										std::vector<std::pair<std::string, argument>> &found_arguments,
+										std::optional<argument> &found_help) {
+
+		for (auto it = parsed_arguments.begin(); it != parsed_arguments.end(); ++it) {
+			std::stringstream error_stream;
+
+			if (!test_conventions(convention_types, values_for_arguments, found_arguments, found_help, it,
+								  error_stream)) {
 				throw std::runtime_error("All trials for argument: \n\t\"" + *it + "\"\n failed with: \n" +
 										 error_stream.str());
 			}
 		}
+	}
+
+	void base_parser::invoke_arguments(std::unordered_map<std::string, std::string> const &values_for_arguments,
+									   std::vector<std::pair<std::string, argument>> const &found_arguments,
+									   std::optional<argument> const &found_help) {
+
+		if (found_help) {
+			found_help->action->invoke();
+			return;
+		}
+
+		std::stringstream error_stream;
+		for (auto const &[key, value] : found_arguments) {
+			try {
+				if (value.expects_parameter()) {
+					value.action->invoke_with_parameter(values_for_arguments.at(key));
+				} else {
+					value.action->invoke();
+				}
+			} catch (const std::runtime_error &e) {
+				error_stream << "Argument " << key << " failed with: " << e.what() << "\n";
+			}
+		}
+
+		std::string error_message = error_stream.str();
+		if (!error_message.empty()) {
+			throw std::runtime_error(error_message);
+		}
+	}
+
+	void base_parser::handle_arguments(std::initializer_list<conventions::convention const *const> convention_types) {
+		enforce_creation_thread();
+
+		deferred_exec reset_current_conventions([this]() { this->reset_current_conventions(); });
+		this->current_conventions(convention_types);
+
+		std::unordered_map<std::string, std::string> values_for_arguments;
+		std::vector<std::pair<std::string, argument>> found_arguments;
+		std::optional<argument> found_help = std::nullopt;
+
+		extract_arguments(convention_types, values_for_arguments, found_arguments, found_help);
+		invoke_arguments(values_for_arguments, found_arguments, found_help);
 		check_for_required_arguments(convention_types);
 		fire_on_complete_events();
 	}
