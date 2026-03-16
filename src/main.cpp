@@ -1,10 +1,10 @@
+#include "headers/parser/parsing_traits/traits.hpp"
 #include <string>
 #define ALLOW_DASH_FOR_WINDOWS 0
 
 #include <argparse>
 #include <fstream>
 #include <iostream>
-#include <parser_v2.hpp>
 #include <regex>
 #include <sstream>
 #include <vector>
@@ -23,12 +23,16 @@ template <> struct argument_parser::parsing_traits::parser_trait<Point> {
 		int y = std::stoi(input.substr(comma_pos + 1));
 		return {x, y};
 	}
+	static constexpr argument_parser::parsing_traits::hint_type format_hint = "x,y";
+	static constexpr argument_parser::parsing_traits::hint_type purpose_hint = "point coordinates";
 };
 
 template <> struct argument_parser::parsing_traits::parser_trait<std::regex> {
 	static std::regex parse(const std::string &input) {
 		return std::regex(input);
 	}
+	static constexpr argument_parser::parsing_traits::hint_type format_hint = "regex";
+	static constexpr argument_parser::parsing_traits::hint_type purpose_hint = "regular expression";
 };
 
 template <> struct argument_parser::parsing_traits::parser_trait<std::vector<int>> {
@@ -41,6 +45,8 @@ template <> struct argument_parser::parsing_traits::parser_trait<std::vector<int
 		}
 		return result;
 	}
+	static constexpr argument_parser::parsing_traits::hint_type format_hint = "int,int,int";
+	static constexpr argument_parser::parsing_traits::hint_type purpose_hint = "list of integers";
 };
 
 template <> struct argument_parser::parsing_traits::parser_trait<std::vector<std::string>> {
@@ -53,13 +59,16 @@ template <> struct argument_parser::parsing_traits::parser_trait<std::vector<std
 		}
 		return result;
 	}
+	static constexpr argument_parser::parsing_traits::hint_type format_hint = "string,string,string";
+	static constexpr argument_parser::parsing_traits::hint_type purpose_hint = "list of strings";
 };
 
 const std::initializer_list<argument_parser::conventions::convention const *const> conventions = {
 	&argument_parser::conventions::gnu_argument_convention,
 	&argument_parser::conventions::gnu_equal_argument_convention,
-	&argument_parser::conventions::windows_argument_convention,
-	&argument_parser::conventions::windows_equal_argument_convention};
+	// &argument_parser::conventions::windows_argument_convention,
+	// &argument_parser::conventions::windows_equal_argument_convention
+};
 
 const auto echo = argument_parser::helpers::make_parametered_action<std::string>(
 	[](std::string const &text) { std::cout << text << std::endl; });
@@ -132,8 +141,7 @@ int v2Examples() {
 	parser.add_argument<std::string>(
 		{{ShortArgument, "e"}, {LongArgument, "echo"}, {Action, echo}, {HelpText, "echoes given variable"}});
 
-	parser.add_argument<Point>(
-		{{ShortArgument, "ep"}, {LongArgument, "echo-point"}, {Action, echo_point}, {HelpText, "echoes given point"}});
+	parser.add_argument<Point>({{ShortArgument, "ep"}, {LongArgument, "echo-point"}, {Action, echo_point}});
 
 	parser.add_argument<std::string>({
 		// stores string for f/file flag
@@ -160,6 +168,8 @@ int v2Examples() {
 		{Required, true} // makes this flag required
 	});
 
+	parser.add_argument({{ShortArgument, "v"}, {LongArgument, "verbose"}});
+
 	parser.on_complete(::run_grep);
 	parser.on_complete(::run_store_point);
 
@@ -168,8 +178,9 @@ int v2Examples() {
 }
 
 int main() {
+	return v2Examples();
+
 	try {
-		return v2Examples();
 	} catch (std::exception const &e) {
 		std::cerr << "Error: " << e.what() << std::endl;
 		return -1;

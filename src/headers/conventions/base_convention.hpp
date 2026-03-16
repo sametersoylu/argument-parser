@@ -1,11 +1,13 @@
 #pragma once
 #include <string>
 #include <utility>
+#include <vector>
 
 #ifndef BASE_CONVENTION_HPP
 #define BASE_CONVENTION_HPP
 
 namespace argument_parser::conventions {
+	enum class convention_features { ALLOW_SHORT_TO_LONG_FALLBACK, ALLOW_LONG_TO_SHORT_FALLBACK };
 	enum class argument_type { SHORT, LONG, POSITIONAL, INTERCHANGABLE, ERROR };
 
 	using parsed_argument = std::pair<argument_type, std::string>;
@@ -18,6 +20,9 @@ namespace argument_parser::conventions {
 		virtual std::string name() const = 0;
 		virtual std::string short_prec() const = 0;
 		virtual std::string long_prec() const = 0;
+		virtual std::pair<std::string, std::string> make_help_text(std::string const &short_arg, std::string const &long_arg,
+										   bool requires_value) const = 0;
+		virtual std::vector<convention_features> get_features() const = 0;
 
 	protected:
 		base_convention() = default;

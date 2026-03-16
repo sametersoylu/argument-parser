@@ -1,4 +1,5 @@
 #include "windows_argument_convention.hpp"
+#include "base_convention.hpp"
 #include <stdexcept>
 
 namespace argument_parser::conventions::implementations {
@@ -49,6 +50,31 @@ namespace argument_parser::conventions::implementations {
 		return "/";
 	}
 
+	std::pair<std::string, std::string> windows_argument_convention::make_help_text(std::string const &short_arg, std::string const &long_arg,
+															bool requires_value) const {
+		std::string s_part = "";
+		if (short_arg != "-" && short_arg != "") {
+			s_part += short_prec() + short_arg;
+			if (requires_value) {
+				s_part += " <value>";
+			}
+		}
+
+		std::string l_part = "";
+		if (long_arg != "-" && long_arg != "") {
+			l_part += long_prec() + long_arg;
+			if (requires_value) {
+				l_part += " <value>";
+			}
+		}
+
+		return {s_part, l_part};
+	}
+
+	std::vector<convention_features> windows_argument_convention::get_features() const {
+		return {convention_features::ALLOW_LONG_TO_SHORT_FALLBACK,
+				convention_features::ALLOW_SHORT_TO_LONG_FALLBACK}; // interchangable
+	}
 } // namespace argument_parser::conventions::implementations
 
 namespace argument_parser::conventions::implementations {
@@ -100,5 +126,31 @@ namespace argument_parser::conventions::implementations {
 
 	std::string windows_kv_argument_convention::long_prec() const {
 		return "/";
+	}
+
+	std::pair<std::string, std::string> windows_kv_argument_convention::make_help_text(std::string const &short_arg,
+															   std::string const &long_arg, bool requires_value) const {
+		std::string s_part = "";
+		if (short_arg != "-" && short_arg != "") {
+			s_part += short_prec() + short_arg;
+			if (requires_value) {
+				s_part += "=<value>, " + short_prec() + short_arg + ":<value>";
+			}
+		}
+
+		std::string l_part = "";
+		if (long_arg != "-" && long_arg != "") {
+			l_part += long_prec() + long_arg;
+			if (requires_value) {
+				l_part += "=<value>, " + long_prec() + long_arg + ":<value>";
+			}
+		}
+
+		return {s_part, l_part};
+	}
+
+	std::vector<convention_features> windows_kv_argument_convention::get_features() const {
+		return {convention_features::ALLOW_LONG_TO_SHORT_FALLBACK,
+				convention_features::ALLOW_SHORT_TO_LONG_FALLBACK}; // interchangable
 	}
 } // namespace argument_parser::conventions::implementations
