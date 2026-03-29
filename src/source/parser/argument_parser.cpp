@@ -32,7 +32,8 @@ namespace argument_parser {
 
 	argument::argument(const argument &other)
 		: id(other.id), name(other.name), action(other.action->clone()), required(other.required),
-		  invoked(other.invoked), help_text(other.help_text) {}
+		  invoked(other.invoked), help_text(other.help_text), positional(other.positional),
+		  position_index(other.position_index) {}
 
 	argument &argument::operator=(const argument &other) {
 		if (this != &other) {
@@ -42,6 +43,8 @@ namespace argument_parser {
 			required = other.required;
 			invoked = other.invoked;
 			help_text = other.help_text;
+			positional = other.positional;
+			position_index = other.position_index;
 		}
 		return *this;
 	}
@@ -78,6 +81,22 @@ namespace argument_parser {
 		help_text = text;
 	}
 
+	bool argument::is_positional() const {
+		return positional;
+	}
+
+	std::optional<int> argument::get_position_index() const {
+		return position_index;
+	}
+
+	void argument::set_positional(bool val) {
+		positional = val;
+	}
+
+	void argument::set_position_index(std::optional<int> idx) {
+		position_index = idx;
+	}
+
 	void base_parser::on_complete(std::function<void(base_parser const &)> const &handler) {
 		on_complete_events.emplace_back(handler);
 	}
@@ -85,7 +104,22 @@ namespace argument_parser {
 	std::string
 	base_parser::build_help_text(std::initializer_list<conventions::convention const *const> convention_types) const {
 		std::stringstream ss;
-		ss << "Usage: " << program_name << " [OPTIONS]...\n";
+		ss << "Usage: " << program_name << " [OPTIONS]...";
+
+		for (auto const &pos_id : positional_arguments) {
+			if (pos_id == -1)
+				continue;
+			auto name_it = reverse_positional_names.find(pos_id);
+			if (name_it == reverse_positional_names.end())
+				continue;
+			auto const &arg = argument_map.at(pos_id);
+			if (arg.is_required()) {
+				ss << " <" << name_it->second << ">";
+			} else {
+				ss << " [" << name_it->second << "]";
+			}
+		}
+		ss << "\n";
 
 		size_t max_short_len = 0;
 		size_t max_long_len = 0;
@@ -97,6 +131,9 @@ namespace argument_parser {
 		std::vector<arg_help_info_t> help_lines;
 
 		for (auto const &[id, arg] : argument_map) {
+			if (arg.is_positional())
+				continue;
+
 			auto short_arg =
 				reverse_short_arguments.find(id) != reverse_short_arguments.end() ? reverse_short_arguments.at(id) : "";
 			auto long_arg =
@@ -124,17 +161,46 @@ namespace argument_parser {
 			help_lines.push_back({parts, arg.help_text});
 		}
 
-		for (auto const &line : help_lines) {
-			ss << "\t";
-			for (size_t i = 0; i < line.convention_parts.size(); ++i) {
-				auto const &parts = line.convention_parts[i];
-				if (i > 0) {
-					ss << "  ";
+		if (!help_lines.empty()) {
+			for (auto const &line : help_lines) {
+				ss << "\t";
+				for (size_t i = 0; i < line.convention_parts.size(); ++i) {
+					auto const &parts = line.convention_parts[i];
+					if (i > 0) {
+						ss << "  ";
+					}
+					ss << std::left << std::setw(static_cast<int>(max_short_len)) << parts.first << "  "
+					   << std::setw(static_cast<int>(max_long_len)) << parts.second;
 				}
-				ss << std::left << std::setw(static_cast<int>(max_short_len)) << parts.first << "  "
-				   << std::setw(static_cast<int>(max_long_len)) << parts.second;
+				ss << "\t" << line.desc << "\n";
 			}
-			ss << "\t" << line.desc << "\n";
+		}
+
+		if (!positional_arguments.empty()) {
+			ss << "\nPositional arguments:\n";
+			size_t max_pos_name_len = 0;
+			for (auto const &pos_id : positional_arguments) {
+				if (pos_id == -1)
+					continue;
+				auto name_it = reverse_positional_names.find(pos_id);
+				if (name_it != reverse_positional_names.end()) {
+					size_t display_len = name_it->second.length() + 2; // for < >
+					if (display_len > max_pos_name_len)
+						max_pos_name_len = display_len;
+				}
+			}
+
+			for (auto const &pos_id : positional_arguments) {
+				if (pos_id == -1)
+					continue;
+				auto name_it = reverse_positional_names.find(pos_id);
+				if (name_it == reverse_positional_names.end())
+					continue;
+				auto const &arg = argument_map.at(pos_id);
+				std::string display_name = "<" + name_it->second + ">";
+				ss << "\t" << std::left << std::setw(static_cast<int>(max_pos_name_len)) << display_name << "\t"
+				   << arg.get_help_text() << "\n";
+			}
 		}
 
 		return ss.str();
@@ -169,7 +235,7 @@ namespace argument_parser {
 	bool base_parser::test_conventions(std::initializer_list<conventions::convention const *const> convention_types,
 									   std::unordered_map<std::string, std::string> &values_for_arguments,
 									   std::vector<std::pair<std::string, argument>> &found_arguments,
-									   std::optional<argument> &found_help, std::vector<std::string>::iterator it,
+									   std::optional<argument> &found_help, std::vector<std::string>::iterator &it,
 									   std::stringstream &error_stream) {
 
 		std::string current_argument = *it;
@@ -214,13 +280,43 @@ namespace argument_parser {
 										std::vector<std::pair<std::string, argument>> &found_arguments,
 										std::optional<argument> &found_help) {
 
+		size_t next_positional_index = 0;
+		bool force_positional = false;
+
 		for (auto it = parsed_arguments.begin(); it != parsed_arguments.end(); ++it) {
+			if (*it == "--") {
+				force_positional = true;
+				continue;
+			}
+
+			if (force_positional) {
+				if (next_positional_index >= positional_arguments.size()) {
+					throw std::runtime_error("Unexpected positional argument: \"" + *it + "\"");
+				}
+				int arg_id = positional_arguments[next_positional_index];
+				argument &pos_arg = argument_map.at(arg_id);
+				std::string const &pos_name = reverse_positional_names.at(arg_id);
+				found_arguments.emplace_back(pos_name, pos_arg);
+				values_for_arguments[pos_name] = *it;
+				next_positional_index++;
+				continue;
+			}
+
 			std::stringstream error_stream;
 
 			if (!test_conventions(convention_types, values_for_arguments, found_arguments, found_help, it,
 								  error_stream)) {
-				throw std::runtime_error("All trials for argument: \n\t\"" + *it + "\"\n failed with: \n" +
-										 error_stream.str());
+				if (next_positional_index < positional_arguments.size()) {
+					int arg_id = positional_arguments[next_positional_index];
+					argument &pos_arg = argument_map.at(arg_id);
+					std::string const &pos_name = reverse_positional_names.at(arg_id);
+					found_arguments.emplace_back(pos_name, pos_arg);
+					values_for_arguments[pos_name] = *it;
+					next_positional_index++;
+				} else {
+					throw std::runtime_error("All trials for argument: \n\t\"" + *it + "\"\n failed with: \n" +
+											 error_stream.str());
+				}
 			}
 		}
 	}
@@ -254,6 +350,7 @@ namespace argument_parser {
 					value.action->invoke();
 				}
 				value.set_invoked(true);
+				argument_map.at(value.id).set_invoked(true);
 			} catch (const std::runtime_error &e) {
 				std::string err{e.what()};
 				err = replace_var(err, "KEY", "for " + key);
@@ -295,6 +392,11 @@ namespace argument_parser {
 			return long_pos->second;
 		if (short_post != short_arguments.end())
 			return short_post->second;
+
+		auto pos_it = positional_name_map.find(arg);
+		if (pos_it != positional_name_map.end())
+			return pos_it->second;
+
 		return std::nullopt;
 	}
 
@@ -322,6 +424,36 @@ namespace argument_parser {
 		}
 	}
 
+	void base_parser::assert_positional_not_exist(std::string const &name) const {
+		if (positional_name_map.find(name) != positional_name_map.end()) {
+			throw std::runtime_error("Positional argument with name '" + name + "' already exists!");
+		}
+	}
+
+	void base_parser::place_positional_argument(int id, argument const &arg, std::string const &name,
+												std::optional<int> position) {
+		argument_map[id] = arg;
+		positional_name_map[name] = id;
+		reverse_positional_names[id] = name;
+
+		if (position.has_value()) {
+			auto idx = static_cast<size_t>(position.value());
+			if (idx > positional_arguments.size()) {
+				positional_arguments.resize(idx + 1, -1);
+			}
+			if (idx < positional_arguments.size() && positional_arguments[idx] != -1) {
+				throw std::runtime_error("Position " + std::to_string(idx) + " is already occupied!");
+			}
+			if (idx == positional_arguments.size()) {
+				positional_arguments.push_back(id);
+			} else {
+				positional_arguments[idx] = id;
+			}
+		} else {
+			positional_arguments.push_back(id);
+		}
+	}
+
 	std::string get_one_name(std::string const &short_name, std::string const &long_name) {
 		std::string res{};
 		if (short_name != "-") {
@@ -340,43 +472,52 @@ namespace argument_parser {
 
 	void base_parser::check_for_required_arguments(
 		std::initializer_list<conventions::convention const *const> convention_types) {
-		std::vector<std::tuple<std::string, std::string, bool>> required_args;
+		std::vector<std::tuple<std::string, std::string, bool, bool>> required_args;
 		for (auto const &[key, arg] : argument_map) {
 			if (arg.is_required() && !arg.is_invoked()) {
-				auto short_arg = reverse_short_arguments.find(key) != reverse_short_arguments.end()
-									 ? reverse_short_arguments.at(key)
-									 : "-";
-				auto long_arg = reverse_long_arguments.find(key) != reverse_long_arguments.end()
-									? reverse_long_arguments.at(key)
-									: "-";
-
-				required_args.emplace_back<std::tuple<std::string, std::string, bool>>(
-					{short_arg, long_arg, arg.expects_parameter()});
+				if (arg.is_positional()) {
+					auto pos_name = reverse_positional_names.find(key) != reverse_positional_names.end()
+										? reverse_positional_names.at(key)
+										: "unknown";
+					required_args.emplace_back(pos_name, "", true, true);
+				} else {
+					auto short_arg = reverse_short_arguments.find(key) != reverse_short_arguments.end()
+										 ? reverse_short_arguments.at(key)
+										 : "-";
+					auto long_arg = reverse_long_arguments.find(key) != reverse_long_arguments.end()
+										? reverse_long_arguments.at(key)
+										: "-";
+					required_args.emplace_back(short_arg, long_arg, arg.expects_parameter(), false);
+				}
 			}
 		}
 
 		if (!required_args.empty()) {
 			std::cerr << "These arguments were expected but not provided: \n";
-			for (auto const &[s, l, p] : required_args) {
-				std::cerr << "\t" << get_one_name(s, l) << ": must be provided as one of [";
-				for (auto it = convention_types.begin(); it != convention_types.end(); ++it) {
-					auto generatedParts = (*it)->make_help_text(s, l, p);
-					std::string help_str = generatedParts.first;
-					if (!generatedParts.first.empty() && !generatedParts.second.empty()) {
-						help_str += "  ";
-					}
-					help_str += generatedParts.second;
+			for (auto const &[s, l, p, is_pos] : required_args) {
+				if (is_pos) {
+					std::cerr << "\t<" << s << ">: positional argument must be provided\n";
+				} else {
+					std::cerr << "\t" << get_one_name(s, l) << ": must be provided as one of [";
+					for (auto it = convention_types.begin(); it != convention_types.end(); ++it) {
+						auto generatedParts = (*it)->make_help_text(s, l, p);
+						std::string help_str = generatedParts.first;
+						if (!generatedParts.first.empty() && !generatedParts.second.empty()) {
+							help_str += "  ";
+						}
+						help_str += generatedParts.second;
 
-					size_t last_not_space = help_str.find_last_not_of(" \t");
-					if (last_not_space != std::string::npos) {
-						help_str.erase(last_not_space + 1);
+						size_t last_not_space = help_str.find_last_not_of(" \t");
+						if (last_not_space != std::string::npos) {
+							help_str.erase(last_not_space + 1);
+						}
+						std::cerr << help_str;
+						if (it + 1 != convention_types.end()) {
+							std::cerr << ", ";
+						}
 					}
-					std::cerr << help_str;
-					if (it + 1 != convention_types.end()) {
-						std::cerr << ", ";
-					}
+					std::cerr << "]\n";
 				}
-				std::cerr << "]\n";
 			}
 			std::cerr << "\n";
 			display_help(convention_types);

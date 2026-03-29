@@ -169,8 +169,29 @@ int v2Examples() {
 
 	parser.add_argument({{ShortArgument, "v"}, {LongArgument, "verbose"}});
 
+	parser.add_argument<std::string>({
+		{Positional, "input"},
+		{HelpText, "Input file to process"},
+		{Required, true},
+	});
+
+	parser.add_argument<std::string>({
+		{Positional, "output"},
+		{HelpText, "Output file path"},
+	});
+
 	parser.on_complete(::run_grep);
 	parser.on_complete(::run_store_point);
+	parser.on_complete([](argument_parser::base_parser const &p) {
+		auto input = p.get_optional<std::string>("input");
+		auto output = p.get_optional<std::string>("output");
+		if (input) {
+			std::cout << "Input: " << input.value() << std::endl;
+		}
+		if (output) {
+			std::cout << "Output: " << output.value() << std::endl;
+		}
+	});
 
 	parser.handle_arguments(conventions);
 	return 0;
