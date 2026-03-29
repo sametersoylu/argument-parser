@@ -21,22 +21,22 @@ After handle_parse(...) ends, we can call the on_parse_done callbacks. But this 
 
 ## Self reminder, implement this feature. It'd be helpful. 
 
-### Update: 6 Oct. 2025 
-We now have storable arguments. Now we need to implement the on_parse_done callbacks, to achieve this feature.
+### Update: 29 March. 2026
+Help text is clear, supports multi convention print, also provides hints for types that provides the hints in the traits.
+Positional argument support is here. Also we now have some tests to ensure the library works as intended. 
+Also introduce package cmake config to enable other developers to install the library and link against their executables. 
 
-Also the run after complete events are implemented. 
-
-# TODO 2: Positional arguments
+# TODO 2: Positional arguments | DONE 
 Positional arguments are arguments that are not prefixed with a dash. They are usually the arguments that are passed to the program. 
 For example, in the command `grep "pattern" file.txt`, "pattern" and "file.txt" are positional arguments.
 
-# TODO 3: Separate headers from implementations
+# TODO 3: Separate headers from implementations | DONE 
 Right now whole project is header only. Header only so far is fine but to avoid issues later on, it's better if we separate them. 
 
-# TODO 4: Configure CMAKE
+# TODO 4: Configure CMAKE | DONE 
 Configure CMAKE to ensure the library can be built as a library and can be installed via CMAKE. This should make adoptation of this to existing projects easier with less headache. 
 
-# TODO 5: Display help 
+# TODO 5: Display help | DONE  
 Display help doesn't reflect the conventions right now. Also it should come automatically, and should be allowed to overriden by user.
 
 # TODO 6: Accumulate repeated calls 
@@ -48,3 +48,10 @@ If given, an arguments default store value could be changed. If nothing was give
 
 # TODO 8: Validators
 If given, validate the argument before passing to the storage or action. If fail, let user decide fail loud or fail skip. 
+
+# TODO 9: Subcommand/Subactions
+Implement subcommand support. Users should be able to define subactions to the higher level action. For example, 
+```cpp
+parser.add_argument<std::string>(
+    {{ShortArgument, "l"}, {LongArgument, "list"}, {Action, list_files}, {HelpText, "Lists files in the directory"}});
+```
