@@ -52,3 +52,6 @@ install(EXPORT argument_parserTargets
 
 add_executable(test src/main.cpp)
 target_link_libraries(test PRIVATE argument_parser)
+
+add_executable(positional_tests src/test.cpp)
+target_link_libraries(positional_tests PRIVATE argument_parser)

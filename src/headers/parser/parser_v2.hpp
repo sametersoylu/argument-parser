@@ -15,7 +15,7 @@
 #include <vector>
 
 namespace argument_parser::v2 {
-	enum class add_argument_flags { ShortArgument, LongArgument, HelpText, Action, Required };
+	enum class add_argument_flags { ShortArgument, LongArgument, Positional, Position, HelpText, Action, Required };
 
 	namespace flags {
 		constexpr static inline add_argument_flags ShortArgument = add_argument_flags::ShortArgument;
@@ -23,12 +23,14 @@ namespace argument_parser::v2 {
 		constexpr static inline add_argument_flags HelpText = add_argument_flags::HelpText;
 		constexpr static inline add_argument_flags Action = add_argument_flags::Action;
 		constexpr static inline add_argument_flags Required = add_argument_flags::Required;
+		constexpr static inline add_argument_flags Positional = add_argument_flags::Positional;
+		constexpr static inline add_argument_flags Position = add_argument_flags::Position;
 	} // namespace flags
 
 	class base_parser : private argument_parser::base_parser {
 	public:
-		template <typename T> using typed_flag_value = std::variant<std::string, parametered_action<T>, bool>;
-		using non_typed_flag_value = std::variant<std::string, non_parametered_action, bool>;
+		template <typename T> using typed_flag_value = std::variant<std::string, parametered_action<T>, bool, int>;
+		using non_typed_flag_value = std::variant<std::string, non_parametered_action, bool, int>;
 
 		template <typename T> using typed_argument_pair = std::pair<add_argument_flags, typed_flag_value<T>>;
 		using non_typed_argument_pair = std::pair<add_argument_flags, non_typed_flag_value>;
@@ -102,6 +104,11 @@ namespace argument_parser::v2 {
 	private:
 		template <bool IsTyped, typename ActionType, typename T, typename ArgsMap>
 		void add_argument_impl(ArgsMap const &argument_pairs) {
+			if (argument_pairs.find(add_argument_flags::Positional) != argument_pairs.end()) {
+				add_positional_argument_impl<IsTyped, ActionType, T>(argument_pairs);
+				return;
+			}
+
 			std::unordered_map<extended_add_argument_flags, bool> found_params{
 				{extended_add_argument_flags::IsTyped, IsTyped}};
 
@@ -203,6 +210,58 @@ namespace argument_parser::v2 {
 						"Could not match the arguments against any overload. The suggested candidate was: " +
 						std::to_string((int(suggested_add))));
 				}
+			}
+		}
+
+		template <bool IsTyped, typename ActionType, typename T, typename ArgsMap>
+		void add_positional_argument_impl(ArgsMap const &argument_pairs) {
+			std::string positional_name =
+				get_or_throw<std::string>(argument_pairs.at(add_argument_flags::Positional), "positional");
+
+			std::string help_text;
+			std::unique_ptr<action_base> action;
+			bool required = false;
+			std::optional<int> position = std::nullopt;
+
+			if (argument_pairs.find(add_argument_flags::Action) != argument_pairs.end()) {
+				action = get_or_throw<ActionType>(argument_pairs.at(add_argument_flags::Action), "action").clone();
+			}
+			if (argument_pairs.find(add_argument_flags::HelpText) != argument_pairs.end()) {
+				help_text = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::HelpText), "help");
+			}
+			if (argument_pairs.find(add_argument_flags::Required) != argument_pairs.end() &&
+				get_or_throw<bool>(argument_pairs.at(add_argument_flags::Required), "required")) {
+				required = true;
+			}
+			if (argument_pairs.find(add_argument_flags::Position) != argument_pairs.end()) {
+				position = get_or_throw<int>(argument_pairs.at(add_argument_flags::Position), "position");
+			}
+
+			if (help_text.empty()) {
+				if constexpr (IsTyped) {
+					if constexpr (internal::sfinae::has_format_hint<parsing_traits::parser_trait<T>>::value &&
+								  internal::sfinae::has_purpose_hint<parsing_traits::parser_trait<T>>::value) {
+						auto format_hint = parsing_traits::parser_trait<T>::format_hint;
+						auto purpose_hint = parsing_traits::parser_trait<T>::purpose_hint;
+						help_text =
+							"Accepts " + std::string(purpose_hint) + " in " + std::string(format_hint) + " format.";
+					} else {
+						help_text = "Accepts value.";
+					}
+				} else {
+					help_text = "Accepts value.";
+				}
+			}
+
+			if constexpr (IsTyped) {
+				if (action) {
+					base::add_positional_argument<T>(positional_name, help_text,
+													 *static_cast<ActionType *>(&(*action)), required, position);
+				} else {
+					base::template add_positional_argument<T>(positional_name, help_text, required, position);
+				}
+			} else {
+				base::template add_positional_argument<std::string>(positional_name, help_text, required, position);
 			}
 		}
 

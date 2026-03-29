@@ -202,11 +202,15 @@ namespace argument_parser {
 		[[nodiscard]] bool is_invoked() const;
 		[[nodiscard]] bool expects_parameter() const;
 		[[nodiscard]] std::string get_help_text() const;
+		[[nodiscard]] bool is_positional() const;
+		[[nodiscard]] std::optional<int> get_position_index() const;
 
 	private:
 		void set_required(bool val);
 		void set_invoked(bool val);
 		void set_help_text(std::string const &text);
+		void set_positional(bool val);
+		void set_position_index(std::optional<int> idx);
 
 		friend class base_parser;
 
@@ -216,6 +220,8 @@ namespace argument_parser {
 		bool required;
 		bool invoked;
 		std::string help_text;
+		bool positional = false;
+		std::optional<int> position_index = std::nullopt;
 	};
 
 	namespace helpers {
@@ -260,6 +266,19 @@ namespace argument_parser {
 			base_add_argument<void>(short_arg, long_arg, help_text, required);
 		}
 
+		template <typename T>
+		void add_positional_argument(std::string const &name, std::string const &help_text,
+									 parametered_action<T> const &action, bool required,
+									 std::optional<int> position = std::nullopt) {
+			base_add_positional_argument(name, help_text, action, required, position);
+		}
+
+		template <typename T>
+		void add_positional_argument(std::string const &name, std::string const &help_text, bool required,
+									 std::optional<int> position = std::nullopt) {
+			base_add_positional_argument<T>(name, help_text, required, position);
+		}
+
 		void on_complete(std::function<void(base_parser const &)> const &action);
 
 		template <typename T> std::optional<T> get_optional(std::string const &arg) const {
@@ -302,7 +321,7 @@ namespace argument_parser {
 		bool test_conventions(std::initializer_list<conventions::convention const *const> convention_types,
 							  std::unordered_map<std::string, std::string> &values_for_arguments,
 							  std::vector<std::pair<std::string, argument>> &found_arguments,
-							  std::optional<argument> &found_help, std::vector<std::string>::iterator it,
+							  std::optional<argument> &found_help, std::vector<std::string>::iterator &it,
 							  std::stringstream &error_stream);
 		void extract_arguments(std::initializer_list<conventions::convention const *const> convention_types,
 							   std::unordered_map<std::string, std::string> &values_for_arguments,
@@ -315,8 +334,11 @@ namespace argument_parser {
 		void enforce_creation_thread();
 
 		void assert_argument_not_exist(std::string const &short_arg, std::string const &long_arg) const;
+		void assert_positional_not_exist(std::string const &name) const;
 		static void set_argument_status(bool is_required, std::string const &help_text, argument &arg);
 		void place_argument(int id, argument const &arg, std::string const &short_arg, std::string const &long_arg);
+		void place_positional_argument(int id, argument const &arg, std::string const &name,
+									   std::optional<int> position);
 
 		template <typename ActionType>
 		void base_add_argument(std::string const &short_arg, std::string const &long_arg, std::string const &help_text,
@@ -348,6 +370,33 @@ namespace argument_parser {
 			}
 		}
 
+		template <typename ActionType>
+		void base_add_positional_argument(std::string const &name, std::string const &help_text,
+										  ActionType const &action, bool required,
+										  std::optional<int> position = std::nullopt) {
+			assert_positional_not_exist(name);
+			int id = id_counter.fetch_add(1);
+			argument arg(id, name, action);
+			set_argument_status(required, help_text, arg);
+			arg.set_positional(true);
+			arg.set_position_index(position);
+			place_positional_argument(id, arg, name, position);
+		}
+
+		template <typename StoreType>
+		void base_add_positional_argument(std::string const &name, std::string const &help_text, bool required,
+										  std::optional<int> position = std::nullopt) {
+			assert_positional_not_exist(name);
+			int id = id_counter.fetch_add(1);
+			auto action = helpers::make_parametered_action<StoreType>(
+				[id, this](StoreType const &value) { stored_arguments[id] = std::any{value}; });
+			argument arg(id, name, action);
+			set_argument_status(required, help_text, arg);
+			arg.set_positional(true);
+			arg.set_position_index(position);
+			place_positional_argument(id, arg, name, position);
+		}
+
 		void check_for_required_arguments(std::initializer_list<conventions::convention const *const> convention_types);
 		void fire_on_complete_events() const;
 
@@ -359,6 +408,10 @@ namespace argument_parser {
 		std::unordered_map<int, std::string> reverse_short_arguments;
 		std::unordered_map<std::string, int> long_arguments;
 		std::unordered_map<int, std::string> reverse_long_arguments;
+
+		std::vector<int> positional_arguments;
+		std::unordered_map<std::string, int> positional_name_map;
+		std::unordered_map<int, std::string> reverse_positional_names;
 
 		std::initializer_list<conventions::convention const *const> _current_conventions;
 		internal::atomic::copyable_atomic<std::thread::id> creation_thread_id = std::this_thread::get_id();
