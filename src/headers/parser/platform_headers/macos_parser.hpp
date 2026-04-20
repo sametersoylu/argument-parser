@@ -4,9 +4,7 @@
 #define MACOS_PARSER_HPP
 
 #include <argument_parser.hpp>
-#include <crt_externs.h>
 #include <parser_v2.hpp>
-#include <string>
 
 namespace argument_parser {
 	class macos_parser : public base_parser {
@@ -17,7 +15,7 @@ namespace argument_parser {
 	namespace v2 {
 		class macos_parser : public v2::base_parser {
 		public:
-			macos_parser();
+			macos_parser(bool should_exit = true);
 			using base_parser::display_help;
 		};
 	} // namespace v2

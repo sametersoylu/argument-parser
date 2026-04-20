@@ -1,8 +1,0 @@
-[
-  {
-    "directory": "C:/Users/samet/Documents/CPP/argparser/argument-parser/build",
-    "command": "C:\\PROGRA~2\\MICROS~2\\18\\BUILDT~1\\VC\\Tools\\MSVC\\1450~1.357\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP -IC:\\Users\\samet\\Documents\\CPP\\argparser\\argument-parser\\src\\headers -IC:\\Users\\samet\\Documents\\CPP\\argparser\\argument-parser\\src\\headers\\parser -IC:\\Users\\samet\\Documents\\CPP\\argparser\\argument-parser\\src\\headers\\conventions -IC:\\Users\\samet\\Documents\\CPP\\argparser\\argument-parser\\src\\headers\\conventions\\implementations -IC:\\Users\\samet\\Documents\\CPP\\argparser\\argument-parser\\src\\headers\\parser\\platform_headers -IC:\\Users\\samet\\Documents\\CPP\\argparser\\argument-parser\\src\\headers\\parser\\parsing_traits /DWIN32 /D_WINDOWS /GR /EHsc /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /FoCMakeFiles\\test.dir\\src\\main.cpp.obj /FdCMakeFiles\\test.dir\\ /FS -c C:\\Users\\samet\\Documents\\CPP\\argparser\\argument-parser\\src\\main.cpp",
-    "file": "C:/Users/samet/Documents/CPP/argparser/argument-parser/src/main.cpp",
-    "output": "C:/Users/samet/Documents/CPP/argparser/argument-parser/build/CMakeFiles/test.dir/src/main.cpp.obj"
-  }
-]

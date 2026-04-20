@@ -95,11 +95,11 @@ namespace argument_parser {
 } // namespace argument_parser
 
 namespace argument_parser::v2 {
-	windows_parser::windows_parser() {
+	windows_parser::windows_parser(bool should_exit) {
 		parse_windows_arguments(ref_parsed_args(),
 								[this](std::string const &program_name) { this->set_program_name(program_name); });
 
-		prepare_help_flag();
+		prepare_help_flag(should_exit);
 	}
 } // namespace argument_parser::v2
 

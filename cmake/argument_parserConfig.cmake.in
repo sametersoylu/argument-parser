@@ -1,0 +1,43 @@
+@PACKAGE_INIT@
+
+include("${CMAKE_CURRENT_LIST_DIR}/argument_parserTargets.cmake")
+
+if(TARGET argument_parser::argument_parser)
+    get_target_property(_argument_parser_imported_configs argument_parser::argument_parser IMPORTED_CONFIGURATIONS)
+
+    if(NOT _argument_parser_imported_configs)
+        get_target_property(_argument_parser_type argument_parser::argument_parser TYPE)
+
+        if(_argument_parser_type STREQUAL "STATIC_LIBRARY")
+            set(_argument_parser_library_path
+                "${PACKAGE_PREFIX_DIR}/@CMAKE_INSTALL_LIBDIR@/${CMAKE_STATIC_LIBRARY_PREFIX}argument_parser${CMAKE_STATIC_LIBRARY_SUFFIX}"
+            )
+
+            set_target_properties(argument_parser::argument_parser PROPERTIES
+                IMPORTED_CONFIGURATIONS NOCONFIG
+                IMPORTED_LINK_INTERFACE_LANGUAGES_NOCONFIG "CXX"
+                IMPORTED_LOCATION_NOCONFIG "${_argument_parser_library_path}"
+            )
+        endif()
+    endif()
+
+    set_target_properties(argument_parser::argument_parser PROPERTIES
+        MAP_IMPORTED_CONFIG_DEBUG NOCONFIG
+        MAP_IMPORTED_CONFIG_RELEASE NOCONFIG
+        MAP_IMPORTED_CONFIG_RELWITHDEBINFO NOCONFIG
+        MAP_IMPORTED_CONFIG_MINSIZEREL NOCONFIG
+    )
+
+    unset(_argument_parser_imported_configs)
+    unset(_argument_parser_type)
+    unset(_argument_parser_library_path)
+endif()
+
+if(NOT TARGET argument_parser AND TARGET argument_parser::argument_parser)
+    add_library(argument_parser INTERFACE IMPORTED)
+    set_target_properties(argument_parser PROPERTIES
+        INTERFACE_LINK_LIBRARIES argument_parser::argument_parser
+    )
+endif()
+
+check_required_components(argument_parser)

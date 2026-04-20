@@ -15,7 +15,7 @@ namespace argument_parser {
 	}
 
 	namespace v2 {
-		linux_parser::linux_parser() {
+		linux_parser::linux_parser(bool should_exit) {
 			std::ifstream command_line_file{"/proc/self/cmdline"};
 			std::string program_name;
 			std::getline(command_line_file, program_name, '\0');
@@ -25,7 +25,7 @@ namespace argument_parser {
 				parsed_arguments.emplace_back(line);
 			}
 
-			prepare_help_flag();
+			prepare_help_flag(should_exit);
 		}
 	} // namespace v2
 } // namespace argument_parser

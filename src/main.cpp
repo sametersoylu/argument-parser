@@ -1,4 +1,7 @@
+#include "macros.h"
+#include "traits.hpp"
 #include <exception>
+#include <memory>
 #include <string>
 
 #include <argparse>
@@ -22,31 +25,23 @@ template <> struct argument_parser::parsing_traits::parser_trait<Point> {
 		int y = std::stoi(input.substr(comma_pos + 1));
 		return {x, y};
 	}
-	static constexpr argument_parser::parsing_traits::hint_type format_hint = "x,y";
-	static constexpr argument_parser::parsing_traits::hint_type purpose_hint = "coordinates";
+
+	static bool validate(Point const& p) {
+		return p.x >= 0 && p.y >= 0;
+	}
+
+	ARGPARSE_TRAIT_FORMAT_HINT = "x,y";
+	ARGPARSE_TRAIT_PURPOSE_HINT = "coordinates";
 };
 
 template <> struct argument_parser::parsing_traits::parser_trait<std::regex> {
 	static std::regex parse(const std::string &input) {
 		return std::regex(input);
 	}
-	static constexpr argument_parser::parsing_traits::hint_type format_hint = "regex";
-	static constexpr argument_parser::parsing_traits::hint_type purpose_hint = "regular expression";
+	ARGPARSE_TRAIT_FORMAT_HINT = "regex";
+	ARGPARSE_TRAIT_PURPOSE_HINT = "regular expression";
 };
 
-template <> struct argument_parser::parsing_traits::parser_trait<std::vector<int>> {
-	static std::vector<int> parse(const std::string &input) {
-		std::vector<int> result;
-		std::stringstream ss{input};
-		std::string item;
-		while (std::getline(ss, item, ',')) {
-			result.push_back(std::stoi(item));
-		}
-		return result;
-	}
-	static constexpr argument_parser::parsing_traits::hint_type format_hint = "int,int,int";
-	static constexpr argument_parser::parsing_traits::hint_type purpose_hint = "list of integers";
-};
 
 template <> struct argument_parser::parsing_traits::parser_trait<std::vector<std::string>> {
 	static std::vector<std::string> parse(const std::string &input) {
@@ -58,8 +53,24 @@ template <> struct argument_parser::parsing_traits::parser_trait<std::vector<std
 		}
 		return result;
 	}
-	static constexpr argument_parser::parsing_traits::hint_type format_hint = "string,string,string";
-	static constexpr argument_parser::parsing_traits::hint_type purpose_hint = "list of strings";
+
+	ARGPARSE_TRAIT_FORMAT_HINT = "string,string,string";
+	ARGPARSE_TRAIT_PURPOSE_HINT = "list of strings";
+};
+
+template <typename VT> struct argument_parser::parsing_traits::parser_trait<std::vector<VT>> {
+	static std::vector<VT> parse(const std::string &input) {
+	    std::vector<VT> result;
+	    std::stringstream ss{input};
+	    std::string item;
+
+	    while (std::getline(ss, item, ',')) {
+	        result.push_back(argument_parser::parsing_traits::parser_trait<VT>::parse(item));
+	    }
+	    return result;
+	}
+	ARGPARSE_TRAIT_FORMAT_HINT = "VT,VT,VT";
+	ARGPARSE_TRAIT_PURPOSE_HINT = "list of VT";
 };
 
 const std::initializer_list<argument_parser::conventions::convention const *const> conventions = {
@@ -87,6 +98,7 @@ const auto cat = argument_parser::helpers::make_parametered_action<std::string>(
 
 	file.close();
 });
+
 
 auto grep(argument_parser::base_parser const &parser, std::string const &filename, std::regex const &pattern) {
 	if (filename.empty()) {
@@ -135,7 +147,7 @@ void run_store_point(argument_parser::base_parser const &parser) {
 
 int v2Examples() {
 	using namespace argument_parser::v2::flags;
-	argument_parser::v2::parser parser;
+	argument_parser::v2::parser parser{ false };
 
 	parser.add_argument<std::string>(
 		{{ShortArgument, "e"}, {LongArgument, "echo"}, {Action, echo}, {HelpText, "echoes given variable"}});
@@ -159,7 +171,8 @@ int v2Examples() {
 	});
 
 	parser.add_argument<std::string>(
-		{{ShortArgument, "c"}, {LongArgument, "cat"}, {Action, cat}, {HelpText, "Prints the content of the file"}});
+		{{ShortArgument, "c"}, {LongArgument, "cat"}, {Action, cat}, {HelpText, "Prints the content of the file"}}
+	);
 
 	parser.add_argument<Point>({
 		// { ShortArgument, "sp" }, // now if ShortArgument or LongArgument is missing, it will use it for the other.
@@ -180,6 +193,8 @@ int v2Examples() {
 		{HelpText, "Output file path"},
 	});
 
+	parser.add_argument<std::vector<Point>>({{LongArgument, "points"}, {HelpText, "List of points to store"}});
+
 	parser.on_complete(::run_grep);
 	parser.on_complete(::run_store_point);
 	parser.on_complete([](argument_parser::base_parser const &p) {
@@ -197,8 +212,41 @@ int v2Examples() {
 	return 0;
 }
 
-int main() {
+auto unique_copy(std::unique_ptr<std::string> ptr) {
+    std::cout << *ptr << std::endl;
+}
+
+auto unique_reference(std::unique_ptr<std::string> const& ptr) {
+    std::cout << *ptr << std::endl;
+}
+
+auto unique_move(std::unique_ptr<std::string>&& ptr) {
+    std::cout << *ptr << std::endl;
+}
+
+template<typename T>
+T return_example(std::function<T()> func) {
+    if constexpr (std::is_same_v<void, T>) {
+        return func();
+    } else {
+        return func();
+    }
+}
+
+template<typename T>
+void log_result(std::function<T()> func) {
+    if constexpr (std::is_same_v<void, T>) {
+        func();
+    } else {
+        std::cout << "result: " << func() << std::endl;
+    }
+}
+
+
+int main(int argc, char **argv) {
 	try {
+	    return_example<void>([]{});
+
 		return v2Examples();
 	} catch (std::exception const &e) {
 		std::cout << e.what() << std::endl;
