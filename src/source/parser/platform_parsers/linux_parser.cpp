@@ -22,7 +22,7 @@ namespace argument_parser {
 			set_program_name(program_name);
 
 			for (std::string line; std::getline(command_line_file, line, '\0');) {
-				parsed_arguments.emplace_back(line);
+				ref_parsed_args().emplace_back(line);
 			}
 
 			prepare_help_flag(should_exit);
