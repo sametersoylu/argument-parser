@@ -14,7 +14,7 @@
 #include <vector>
 
 namespace argument_parser::v2 {
-	enum class add_argument_flags { ShortArgument, LongArgument, Positional, Position, HelpText, Action, Required };
+	enum class add_argument_flags { ShortArgument, LongArgument, Positional, Position, HelpText, Action, Required, Reference };
 
 	namespace flags {
 		constexpr static inline add_argument_flags ShortArgument = add_argument_flags::ShortArgument;
@@ -24,6 +24,7 @@ namespace argument_parser::v2 {
 		constexpr static inline add_argument_flags Required = add_argument_flags::Required;
 		constexpr static inline add_argument_flags Positional = add_argument_flags::Positional;
 		constexpr static inline add_argument_flags Position = add_argument_flags::Position;
+		constexpr static inline add_argument_flags Reference = add_argument_flags::Reference;
 	} // namespace flags
 
 	class base_parser : private argument_parser::base_parser {
