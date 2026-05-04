@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/Users/killua/Projects/c++/argparser/argument-parser/examples/test/build",
+  "command": "/usr/bin/c++ -isystem /usr/local/include/argparse -isystem /usr/local/include/argparse/parser -isystem /usr/local/include/argparse/conventions -isystem /usr/local/include/argparse/conventions/implementations -isystem /usr/local/include/argparse/parser/platform_headers -isystem /usr/local/include/argparse/parser/parsing_traits -g -std=gnu++17 -arch arm64 -o CMakeFiles/main.dir/main.cpp.o -c /Users/killua/Projects/c++/argparser/argument-parser/examples/test/main.cpp",
+  "file": "/Users/killua/Projects/c++/argparser/argument-parser/examples/test/main.cpp",
+  "output": "/Users/killua/Projects/c++/argparser/argument-parser/examples/test/build/CMakeFiles/main.dir/main.cpp.o"
+}
+]
