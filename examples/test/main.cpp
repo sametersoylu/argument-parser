@@ -1,14 +1,48 @@
+
 #include <argparse>
 #include <gnu_argument_convention.hpp>
-#include <parser_v3.hpp>
+#include <macros.h>
 #include <iostream>
-#include <regex>
+#include <string>
+#include <traits.hpp>
 
 using argument = argument_parser::builder::argument<>;
+
+using argument_parser::parsing_traits::hint_type;
 
 auto echo(std::string const& s) -> void {
     std::cout << s << '\n';
 }
+
+using namespace argument_parser::parsing_traits;
+
+constexpr hint_type vector_purpose_hint = "vector of ";
+
+template<typename T>
+class parser_trait<std::vector<T>> {
+    public:
+    static std::vector<T> parse(std::string const& s) {
+        std::vector<T> result;
+        std::stringstream ss(s);
+
+        for (std::string line; std::getline(ss, line, ',');) {
+            T item = parser_trait<T>::parse(line);
+            result.push_back(item);
+        }
+        return result;
+    }
+
+    ARGPARSE_TRAIT_FORMAT_HINT = concat<
+        hint_provider<&parser_trait<T>::format_hint>,
+        hint_provider<&comma>,
+        hint_provider<&parser_trait<T>::format_hint>
+    >;
+
+    ARGPARSE_TRAIT_PURPOSE_HINT = concat<
+        hint_provider<&vector_purpose_hint>,
+        hint_provider<&parser_trait<T>::purpose_hint>
+    >;
+};
 
 auto main() -> int {
     argument_parser::v2::parser parser(false);
@@ -17,7 +51,6 @@ auto main() -> int {
         .positional("count")
         .position(0)
         .help_text("How many times to repeat the action.")
-        .required()
         .action<int>([](int const& count) {
             std::cout << "count action configured for " << count << '\n';
         })
@@ -35,17 +68,27 @@ auto main() -> int {
         .help_text("Store a boolean flag.")
         .build(parser);
 
-    argument::start()
-        .long_argument("output")
-        .help_text("Store a string value.")
-        .store<std::regex>()
-        .build(parser);
+    // argument::start()
+    //     .long_argument("regex")
+    //     .help_text("Store a regex value.")
+    //     .store<std::optional<std::regex>>()
+    //     .build(parser);
 
     argument::start()
         .short_argument("e")
         .long_argument("echo")
         .help_text("Echo the parsed value.")
         .action(echo)
+        .build(parser);
+
+    argument::start()
+        .long_argument("vecstr")
+        .short_argument("vs")
+        .action<std::vector<int>>([](std::vector<int> const& vecstr) {
+            for (auto const& str : vecstr) {
+                std::cout << str << '\n';
+            }
+        })
         .build(parser);
 
     parser.handle_arguments({
