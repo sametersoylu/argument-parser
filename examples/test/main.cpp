@@ -3,6 +3,7 @@
 #include <gnu_argument_convention.hpp>
 #include <macros.h>
 #include <iostream>
+#include <parser_v2.hpp>
 #include <string>
 #include <traits.hpp>
 
@@ -44,6 +45,8 @@ class parser_trait<std::vector<T>> {
     >;
 };
 
+using namespace argument_parser::v2::flags;
+
 auto main() -> int {
     argument_parser::v2::parser parser(false);
 
@@ -62,6 +65,12 @@ auto main() -> int {
         .help_text("Store the parsed value through a reference.")
         .reference(captured_value)
         .build(parser);
+
+    // parser.add_argument<int>({
+    //     {ShortArgument, "c"},
+    //     {HelpText, "capture count"},
+    //     {Reference, &captured_value},
+    // });
 
     argument::start()
         .short_argument("q")
@@ -94,6 +103,8 @@ auto main() -> int {
     parser.handle_arguments({
         &argument_parser::conventions::gnu_argument_convention
     });
+
+    std::cout << "captured value: " << captured_value << '\n';
 
     return 0;
 }

@@ -184,7 +184,7 @@ public:
         using next_argument = argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), T>;
 
         next_argument next{*this};
-        next.m_reference = static_cast<void*>(std::addressof(value));
+        next.m_reference = std::addressof(value);
         next.m_value_mode = value_mode::reference;
         return next;
     }
@@ -273,7 +273,7 @@ private:
           m_help_text(other.m_help_text),
           m_required(other.m_required),
           m_action(other.m_action),
-          m_reference(other.m_reference),
+          m_reference(copy_reference(other.m_reference)),
           m_value_mode(other.m_value_mode) {}
 
     template<typename T>
@@ -361,7 +361,7 @@ private:
 
     auto build_reference(argument_parser::v2::base_parser& parser) const -> void {
         auto pairs = make_typed_pairs<store_type>();
-        auto* target = static_cast<store_type*>(m_reference);
+        auto* target = m_reference;
         auto key = lookup_key();
 
         if (target == nullptr) {
@@ -414,8 +414,17 @@ private:
     std::string m_help_text{};
     bool m_required = false;
     std::shared_ptr<argument_parser::action_base const> m_action{};
-    void* m_reference = nullptr;
+    store_type* m_reference = nullptr;
     value_mode m_value_mode = value_mode::unresolved;
+
+    template<typename other_store_type>
+    static auto copy_reference(other_store_type* reference) -> store_type* {
+        if constexpr (std::is_same_v<store_type, other_store_type>) {
+            return reference;
+        } else {
+            return nullptr;
+        }
+    }
 
     template<mask_type other_mask, typename other_store_type>
     friend class argument;
