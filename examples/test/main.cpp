@@ -52,7 +52,7 @@ auto main() -> int {
 
     argument::start()
         .positional("count")
-        .position(0)
+        .position(1)
         .help_text("How many times to repeat the action.")
         .action<int>([](int const& count) {
             std::cout << "count action configured for " << count << '\n';
@@ -62,6 +62,13 @@ auto main() -> int {
     int captured_value = 0;
     argument::start()
         .long_argument("threshold")
+        .help_text("Store the parsed value through a reference.")
+        .reference(captured_value)
+        .build(parser);
+
+    argument::start()
+        .positional("captured")
+        .position(0)
         .help_text("Store the parsed value through a reference.")
         .reference(captured_value)
         .build(parser);
