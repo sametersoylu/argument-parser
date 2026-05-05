@@ -1,17 +1,21 @@
 # argument-parser
 
-A lightweight, modern, expressively typed, and highly customizable C++17 argument parser library.
+A lightweight, modern, and highly customizable C++17 argument parser with native platform argument collection, trait-driven typed parsing, pluggable option conventions, and a fluent `v2` builder API.
+
+> `v1` is deprecated and mainly kept as implementation history. For new projects, use `argument_parser::v2` together with `argument_parser::builder`.
 
 ## Features
 
-- **Type-safe Argument Extraction**: Use type traits to automatically parse fundamental types and custom structures (e.g. `std::vector<int>`, `std::regex`, `Point`).
-- **Support for Multiple Parsing Conventions**: Pluggable convention system out of the box, offering GNU-style (`-a`, `--arg`), GNU-equal-style (`--arg=value`), Windows-style (`/arg`), and Windows-equal-style (`/arg:value`).
-- **Automated Help Text Formatting**: Call `parser.display_help(conventions)` to easily generate beautifully formatted usage instructions.
-- **Cross-Platform Native Parsers**: Dedicated parsers that automatically fetch command-line arguments using OS-specific APIs (`windows_parser`, `linux_parser`, `macos_parser`), so you don't need to manually pass `argc` and `argv` on most platforms.
-- **Fluid setup**: Enjoy fluid setup routines with maps and initializer lists.
-
-### Important Note: 
-V1 is deprecated and is mainly kept as a base implementation for the V2. You should use V2 for your projects. If any features are missing compared to V1, please let me know so I can introduce them!
+- Native platform parser alias: `argument_parser::v2::parser` resolves to the current platform parser and reads arguments directly from OS APIs.
+- Fluent builder API with compile-time builder constraints that prevent invalid combinations after a terminal/mutually exclusive mode has been selected.
+- Type-safe parsing and extraction. Just extend `parser_trait<T>` for your types and if just want to store use `get_optional<T>()`!
+- Positional arguments with optional explicit ordering and support for `--` as a positional separator.
+- Trait-driven `format_hint` and `purpose_hint` metadata used in generated help text and parse errors.
+- Automatic help flag on `argument_parser::v2::parser` (`-h`, `--help`) with configurable exit behavior.
+- Auto-formatted help output..
+- Completion hooks via `parser.on_complete(...)`.
+- Pluggable conventions for GNU next-token, GNU equal-style, Windows next-token, and Windows inline `=` / `:` parsing, or bring your own!
+- Testing helper + pseudo command handler `argument_parser::v2::fake_parser`.
 
 ## Requirements
 
@@ -20,98 +24,186 @@ V1 is deprecated and is mainly kept as a base implementation for the V2. You sho
 
 ## Quick Start
 
-### 1. Create your Parser and Define Arguments
-
 ```cpp
+#include <argparse>
 #include <iostream>
 #include <string>
-#include <regex>
-#include <argparse> // Provides the native parser for your compiling platform
+
+using argument = argument_parser::builder::argument<>;
 
 int main() {
-    using namespace argument_parser::v2::flags;
-    
-    // Automatically uses the platform-native parser!
-    // It will fetch arguments directly from OS APIs (e.g., GetCommandLineW on Windows)
-    argument_parser::v2::parser parser;
+    argument_parser::v2::parser parser(false); // --help prints without exiting immediately
 
-    // A flag with an action
-    parser.add_argument<std::string>({
-        {ShortArgument, "e"}, 
-        {LongArgument, "echo"}, 
-        {Action, argument_parser::helpers::make_parametered_action<std::string>(
-            [](std::string const &text) { std::cout << text << std::endl; }
-        )}, 
-        {HelpText, "echoes given variable"}
-    });
+    int threshold = 0;
 
-    // A flag that just stores the value to extract later
-    parser.add_argument<std::regex>({
-        {ShortArgument, "g"},
-        {LongArgument, "grep"},
-        {HelpText, "Grep pattern"}
-    });
+    argument::start()
+        .short_argument("e")
+        .long_argument("echo")
+        .action<std::string>([](std::string const& text) {
+            std::cout << text << '\n';
+        })
+        .build(parser);
 
-    // A required flag 
-    parser.add_argument<std::string>({
-        {LongArgument, "file"},
-        {Required, true},
-        {HelpText, "File to grep"}
-    });
+    argument::start()
+        .long_argument("file")
+        .store<std::string>()
+        .required()
+        .help_text("Input file to process.")
+        .build(parser);
 
-    // Run action callback on complete 
-    parser.on_complete([](argument_parser::base_parser const &p) {
-        auto filename = p.get_optional<std::string>("file");
-        auto pattern = p.get_optional<std::regex>("grep");
-        
-        if (filename && pattern) {
-            std::cout << "Grepping " << filename.value() << " with pattern." << std::endl;
+    argument::start()
+        .long_argument("threshold")
+        .reference(threshold)
+        .build(parser);
+
+    argument::start()
+        .short_argument("v")
+        .long_argument("verbose")
+        .flag()
+        .help_text("Enable verbose output.")
+        .build(parser);
+
+    argument::start()
+        .positional("output")
+        .position(0)
+        .help_text("Output file.")
+        .build(parser);
+
+    parser.on_complete([](auto const& state) {
+        if (auto file = state.template get_optional<std::string>("file")) {
+            std::cout << "completed for: " << *file << '\n';
         }
     });
 
-    // Register Conventions 
     const std::initializer_list<argument_parser::conventions::convention const *const> conventions = {
         &argument_parser::conventions::gnu_argument_convention,
-        &argument_parser::conventions::windows_argument_convention
+        &argument_parser::conventions::gnu_equal_argument_convention,
+        &argument_parser::conventions::windows_argument_convention,
+        &argument_parser::conventions::windows_equal_argument_convention,
     };
 
-    // Execute logic! 
     parser.handle_arguments(conventions);
 
-    return 0;
+    if (auto file = parser.get_optional<std::string>("file")) {
+        std::cout << "file: " << *file << '\n';
+    }
+
+    std::cout << "threshold: " << threshold << '\n';
 }
 ```
 
-### 2. Custom Type Parsing
+## Trait-Driven Parsing and Hints
 
-You can natively parse your custom structs, objects, or arrays by specializing `argument_parser::parsing_traits::parser_trait<T>`.
+Specialize `argument_parser::parsing_traits::parser_trait<T>` to add support for your own types and to describe their expected format.
 
 ```cpp
+#include <macros.h>
+#include <traits.hpp>
+#include <stdexcept>
+#include <string>
+
 struct Point {
-    int x, y;
+    int x;
+    int y;
 };
 
-template <> struct argument_parser::parsing_traits::parser_trait<Point> {
-    static Point parse(const std::string &input) {
-        auto comma_pos = input.find(',');
-        int x = std::stoi(input.substr(0, comma_pos));
-        int y = std::stoi(input.substr(comma_pos + 1));
-        return {x, y};
+template <>
+struct argument_parser::parsing_traits::parser_trait<Point> {
+    static Point parse(std::string const& input) {
+        auto comma = input.find(',');
+        if (comma == std::string::npos) {
+            throw std::runtime_error("Expected x,y");
+        }
+
+        return {
+            std::stoi(input.substr(0, comma)),
+            std::stoi(input.substr(comma + 1))
+        };
     }
-};
 
-// Now you can directly use your type:
-// parser.add_argument<Point>({ {LongArgument, "point"} });
-// auto point = parser.get_optional<Point>("point");
+    ARGPARSE_TRAIT_FORMAT_HINT = "x,y";
+    ARGPARSE_TRAIT_PURPOSE_HINT = "point coordinates";
+};
+```
+
+Then use the type directly from the builder:
+
+```cpp
+argument::start()
+    .long_argument("point")
+    .store<Point>()
+    .build(parser);
+```
+
+If you omit `help_text()`, `v2` uses the trait hints to generate help such as `Accepts point coordinates in x,y format.` The same hints are also included in type conversion errors.
+
+## Help Behavior
+
+`argument_parser::v2::parser` automatically registers `-h` and `--help`.
+
+```cpp
+argument_parser::v2::parser parser;       // help prints and exits
+argument_parser::v2::parser parser(false); // help prints without immediate exit
+```
+
+You can also display help manually:
+
+```cpp
+parser.display_help(conventions);
+```
+
+## Supported Conventions
+
+- GNU next-token: `-o value`, `--output value`
+- GNU equal-style: `-o=value`, `--output=value`
+- Windows next-token: `/output value`
+- Windows inline value: `/output=value`, `/output:value`
+
+Mix any of them in the same parser by passing the conventions you want to `handle_arguments()`.
+
+## Builder Modes
+
+`argument_parser::builder::argument<>` is a staged builder. `build(parser)` is the terminal call.
+
+Before `build(...)`, you compose an argument from three kinds of steps:
+
+- Identifier selection: `short_argument(...)`, `long_argument(...)`, or `positional(...)`
+- Optional metadata: `position(...)` for positional arguments, `help_text(...)`, and `required(...)`
+- One mutually exclusive value behavior:
+  - `store<T>()` to parse and retain a value for later `get_optional<T>()`
+  - `flag()` to store a boolean presence flag
+  - `reference(value)` to write the parsed result directly into an existing variable
+  - `action([] { ... })` for no-value callbacks
+  - `action<T>([](T const&) { ... })` for typed value callbacks
+
+Once you select one value behavior, the other value behavior methods are disabled at compile time, so combinations like `store<T>().action(...)` or `flag().reference(value)` are rejected by the type system. Also you cannot use the same method repeatedly as it is also disabled at compile time by the type system.
+
+If you do not select a value behavior explicitly, `build(parser)` uses the default for the argument kind: named arguments become boolean flags, while positional arguments store a `std::string`.
+
+## Testing
+
+For unit tests or synthetic argument lists, use `argument_parser::v2::fake_parser` instead of the native platform parser:
+
+```cpp
+#include <fake_parser.hpp>
+
+argument_parser::v2::fake_parser parser("tool", {"--count", "3", "input.txt"});
 ```
 
 ## CMake Integration
 
-The library can be installed globally via CMake or incorporated into your project.
+Use the project directly:
 
 ```cmake
 add_subdirectory(argument-parser)
 target_link_libraries(your_target PRIVATE argument_parser)
+```
+
+Or install and consume it as a package:
+
+```cmake
+find_package(argument_parser CONFIG REQUIRED)
+target_link_libraries(your_target PRIVATE argument_parser::argument_parser)
 ```
 
 ## Building & Installing
@@ -120,4 +212,5 @@ target_link_libraries(your_target PRIVATE argument_parser)
 mkdir build && cd build
 cmake ..
 cmake --build .
+cmake --install .
 ```
