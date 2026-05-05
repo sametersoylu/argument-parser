@@ -46,12 +46,38 @@ instead of an action doing it.
 # TODO 7: Defaults/Implicits
 If given, an arguments default store value could be changed. If nothing was given use that value instead.
 
-# TODO 8: Validators
+# TODO 8: Validators | DONE
 If given, validate the argument before passing to the storage or action. If fail, let user decide fail loud or fail skip. 
 
 # TODO 9: Subcommand/Subactions
 Implement subcommand support. Users should be able to define subactions to the higher level action. For example, 
 ```cpp
-parser.add_argument<std::string>(
-    {{ShortArgument, "l"}, {LongArgument, "list"}, {Action, list_files}, {HelpText, "Lists files in the directory"}});
+parser.add_argument(
+    {{ShortArgument, "g"}, {LongArgument, "get"}, {Action, get_}, {HelpText, "Gets <files, system_info, status>"}}
+);
+parser.add_argument(
+    {{BaseArgument, "g"}, {ShortArgument, "f"}, {LongArgument, "files"}, {Action, get_files}, {HelpText, "Gets files"}}
+);
+...
+```
+
+# TODO 10: Reference capture | DONE
+Reference capturing. 
+```cpp
+parser.add_argument<int>({
+    {ShortArgument, "c"},
+    {HelpText, "capture value"},
+    {Reference, &captured_value},
+});
+```
+
+# TODO 11: Builder | DONE
+Implement type safe logic enforcing argument builder; 
+```cpp
+argument::start()
+    .short_argument("e")
+    .long_argument("echo")
+    .help_text("Echo the parsed value.")
+    .action(echo)
+    .build(parser);
 ```
