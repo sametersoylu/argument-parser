@@ -368,12 +368,8 @@ private:
             throw std::logic_error("reference() was selected without a target.");
         }
 
+        pairs[argument_parser::v2::flags::Reference] = target;
         parser.template add_argument<store_type>(pairs);
-        parser.on_complete([target, key](argument_parser::base_parser const& completed_parser) {
-            if (auto value = completed_parser.template get_optional<store_type>(key)) {
-                *target = value.value();
-            }
-        });
     }
 
     auto build_parametered_action(argument_parser::v2::base_parser& parser) const -> void {

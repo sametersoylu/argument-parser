@@ -154,9 +154,13 @@ namespace argument_parser::v2 {
 				found_params[extended_add_argument_flags::Action] = true;
 				if constexpr (!std::is_same_v<T, void>) {
 				    auto ref = get_or_throw<T*>(argument_pairs.at(add_argument_flags::Reference), "reference");
-					action = helpers::make_parametered_action<T>([ref](T const& t) {
-					    *ref = t;
-					}).clone();
+					if (action) {
+					    throw std::logic_error("Cannot use both action and reference for the same argument");
+					} else {
+						action = helpers::make_parametered_action<T>([ref](T const& t) {
+							*ref = t;
+						}).clone();
+					}
 				} else {
 				    throw std::logic_error("Reference argument must not be void");
 				}
@@ -254,6 +258,26 @@ namespace argument_parser::v2 {
 			if (argument_pairs.find(add_argument_flags::Position) != argument_pairs.end()) {
 				position = get_or_throw<int>(argument_pairs.at(add_argument_flags::Position), "position");
 			}
+
+			if (argument_pairs.find(add_argument_flags::Reference) != argument_pairs.end()) {
+				if (!IsTyped) {
+				    throw std::logic_error("Reference argument must be typed");
+				}
+
+				if constexpr (!std::is_same_v<T, void>) {
+				    auto ref = get_or_throw<T*>(argument_pairs.at(add_argument_flags::Reference), "reference");
+					if (action) {
+					    throw std::logic_error("Cannot use both action and reference for the same argument");
+					} else {
+						action = helpers::make_parametered_action<T>([ref](T const& t) {
+							*ref = t;
+						}).clone();
+					}
+				} else {
+				    throw std::logic_error("Reference argument must not be void");
+				}
+			}
+
 
 			if (help_text.empty()) {
 				if constexpr (IsTyped) {
