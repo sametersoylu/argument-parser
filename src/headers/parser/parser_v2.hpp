@@ -9,12 +9,13 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <unordered_map>
 #include <variant>
 #include <vector>
 
 namespace argument_parser::v2 {
-	enum class add_argument_flags { ShortArgument, LongArgument, Positional, Position, HelpText, Action, Required };
+	enum class add_argument_flags { ShortArgument, LongArgument, Positional, Position, HelpText, Action, Required, Reference };
 
 	namespace flags {
 		constexpr static inline add_argument_flags ShortArgument = add_argument_flags::ShortArgument;
@@ -24,11 +25,12 @@ namespace argument_parser::v2 {
 		constexpr static inline add_argument_flags Required = add_argument_flags::Required;
 		constexpr static inline add_argument_flags Positional = add_argument_flags::Positional;
 		constexpr static inline add_argument_flags Position = add_argument_flags::Position;
+		constexpr static inline add_argument_flags Reference = add_argument_flags::Reference;
 	} // namespace flags
 
 	class base_parser : private argument_parser::base_parser {
 	public:
-		template <typename T> using typed_flag_value = std::variant<std::string, parametered_action<T>, bool, int>;
+		template <typename T> using typed_flag_value = std::variant<std::string, parametered_action<T>, bool, int, T*>;
 		using non_typed_flag_value = std::variant<std::string, non_parametered_action, bool, int>;
 
 		template <typename T> using typed_argument_pair = std::pair<add_argument_flags, typed_flag_value<T>>;
@@ -144,6 +146,22 @@ namespace argument_parser::v2 {
 				required = true;
 			}
 
+			if (argument_pairs.find(add_argument_flags::Reference) != argument_pairs.end()) {
+				if (!IsTyped) {
+				    throw std::logic_error("Reference argument must be typed");
+				}
+
+				found_params[extended_add_argument_flags::Action] = true;
+				if constexpr (!std::is_same_v<T, void>) {
+				    auto ref = get_or_throw<T*>(argument_pairs.at(add_argument_flags::Reference), "reference");
+					action = helpers::make_parametered_action<T>([ref](T const& t) {
+					    *ref = t;
+					}).clone();
+				} else {
+				    throw std::logic_error("Reference argument must not be void");
+				}
+			}
+
 			auto suggested_add = suggest_candidate(found_params);
 			if (suggested_add == candidate_type::unknown) {
 				throw std::runtime_error("Could not match any add argument overload to given parameters. Are you "
@@ -165,8 +183,7 @@ namespace argument_parser::v2 {
 						}
 					}
 
-					base::add_argument(short_arg, long_arg, help_text, *static_cast<ActionType *>(&(*action)),
-									   required);
+					base::add_argument(short_arg, long_arg, help_text, *static_cast<ActionType *>(&(*action)), required);
 					break;
 				case candidate_type::store_other:
 					if (help_text.empty()) {

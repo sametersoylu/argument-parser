@@ -2,6 +2,8 @@
 #ifndef ARGPARSE_HPP
 #define ARGPARSE_HPP
 #include <argument_parser.hpp>
+#include <parser_v2.hpp>
+#include <argument_builder.hpp>
 #include "macros.h"
 
 #ifdef __linux__
