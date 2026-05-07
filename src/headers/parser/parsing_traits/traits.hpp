@@ -5,12 +5,12 @@
 #include <string>
 
 namespace argument_parser::parsing_traits {
-	using hint_type = const char*;
+	using hint_type = const char *;
 
 	template <typename T_> struct parser_trait {
 		using type = T_;
 		static T_ parse(const std::string &input);
-		static bool validate(T_ const&);
+		static bool validate(T_ const &);
 
 		static constexpr hint_type format_hint = "value";
 		static constexpr hint_type purpose_hint = "value";
@@ -51,40 +51,36 @@ namespace argument_parser::parsing_traits {
 		static constexpr hint_type purpose_hint = "double precision floating point number";
 	};
 
-
-
 	constexpr hint_type comma = ",";
-    template <const hint_type* PtrAddr>
-    struct hint_provider {
-        static constexpr hint_type value = *PtrAddr;
-    };
+	template <const hint_type *PtrAddr> struct hint_provider {
+		static constexpr hint_type value = *PtrAddr;
+	};
 
-    template<typename... Providers>
-    struct joiner {
-        static constexpr auto get_combined() {
-            constexpr size_t total_len = (std::string_view{Providers::value}.length() + ... + 0);
+	template <typename... Providers> struct joiner {
+		static constexpr auto get_combined() {
+			constexpr size_t total_len = (std::string_view{Providers::value}.length() + ... + 0);
 
-            std::array<char, total_len + 1> arr{};
-            size_t offset = 0;
+			std::array<char, total_len + 1> arr{};
+			size_t offset = 0;
 
-            auto append = [&](hint_type s) {
-                std::string_view sv{s};
-                for (char c : sv) arr[offset++] = c;
-                return 0;
-            };
+			auto append = [&](hint_type s) {
+				std::string_view sv{s};
+				for (char c : sv)
+					arr[offset++] = c;
+				return 0;
+			};
 
-            (append(Providers::value), ...);
+			(append(Providers::value), ...);
 
-            arr[total_len] = '\0';
-            return arr;
-        }
+			arr[total_len] = '\0';
+			return arr;
+		}
 
-        static constexpr auto storage = get_combined();
-        static constexpr hint_type value = storage.data();
-    };
+		static constexpr auto storage = get_combined();
+		static constexpr hint_type value = storage.data();
+	};
 
-    template<typename... Providers>
-    constexpr hint_type concat = joiner<Providers...>::value;
+	template <typename... Providers> constexpr hint_type concat = joiner<Providers...>::value;
 
 } // namespace argument_parser::parsing_traits
 

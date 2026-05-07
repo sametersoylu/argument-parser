@@ -1,10 +1,10 @@
 #pragma once
 #ifndef ARGPARSE_HPP
 #define ARGPARSE_HPP
+#include "macros.h"
+#include <argument_builder.hpp>
 #include <argument_parser.hpp>
 #include <parser_v2.hpp>
-#include <argument_builder.hpp>
-#include "macros.h"
 
 #ifdef __linux__
 #include <linux_parser.hpp>

@@ -23,28 +23,27 @@ namespace argument_parser {
 	}
 
 	namespace v2 {
-    	fake_parser::fake_parser(std::string program_name, std::vector<std::string> const &arguments) {
-    		set_program_name(program_name);
-    		ref_parsed_args() = arguments;
-            prepare_help_flag(false);
-    	}
+		fake_parser::fake_parser(std::string program_name, std::vector<std::string> const &arguments) {
+			set_program_name(program_name);
+			ref_parsed_args() = arguments;
+			prepare_help_flag(false);
+		}
 
-    	fake_parser::fake_parser(std::string const &program_name, std::vector<std::string> &&arguments) {
-       		set_program_name(program_name);
-    		ref_parsed_args() = std::move(arguments);
-            prepare_help_flag(false);
-    	}
+		fake_parser::fake_parser(std::string const &program_name, std::vector<std::string> &&arguments) {
+			set_program_name(program_name);
+			ref_parsed_args() = std::move(arguments);
+			prepare_help_flag(false);
+		}
 
-    	fake_parser::fake_parser(std::string const &program_name, std::initializer_list<std::string> const &arguments)
-    		: fake_parser(program_name, std::vector<std::string>(arguments)) {
-        }
+		fake_parser::fake_parser(std::string const &program_name, std::initializer_list<std::string> const &arguments)
+			: fake_parser(program_name, std::vector<std::string>(arguments)) {}
 
-    	void fake_parser::set_program_name(std::string const &program_name) {
-       		set_program_name(program_name);
-    	}
+		void fake_parser::set_program_name(std::string const &program_name) {
+			set_program_name(program_name);
+		}
 
-    	void fake_parser::set_parsed_arguments(std::vector<std::string> const &parsed_arguments) {
-    		ref_parsed_args() = parsed_arguments;
-    	}
-	}
+		void fake_parser::set_parsed_arguments(std::vector<std::string> const &parsed_arguments) {
+			ref_parsed_args() = parsed_arguments;
+		}
+	} // namespace v2
 } // namespace argument_parser

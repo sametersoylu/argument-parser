@@ -31,7 +31,7 @@ namespace argument_parser {
 			void set_program_name(std::string const &program_name);
 			void set_parsed_arguments(std::vector<std::string> const &parsed_arguments);
 		};
-	}
+	} // namespace v2
 } // namespace argument_parser
 
 #endif

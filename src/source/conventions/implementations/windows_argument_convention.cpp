@@ -50,8 +50,9 @@ namespace argument_parser::conventions::implementations {
 		return "/";
 	}
 
-	std::pair<std::string, std::string> windows_argument_convention::make_help_text(std::string const &short_arg, std::string const &long_arg,
-															bool requires_value) const {
+	std::pair<std::string, std::string> windows_argument_convention::make_help_text(std::string const &short_arg,
+																					std::string const &long_arg,
+																					bool requires_value) const {
 		std::string s_part = "";
 		if (short_arg != "-" && short_arg != "") {
 			s_part += short_prec() + short_arg;
@@ -129,7 +130,8 @@ namespace argument_parser::conventions::implementations {
 	}
 
 	std::pair<std::string, std::string> windows_kv_argument_convention::make_help_text(std::string const &short_arg,
-															   std::string const &long_arg, bool requires_value) const {
+																					   std::string const &long_arg,
+																					   bool requires_value) const {
 		std::string s_part = "";
 		if (short_arg != "-" && short_arg != "") {
 			s_part += short_prec() + short_arg;

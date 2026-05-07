@@ -15,7 +15,16 @@
 #include <vector>
 
 namespace argument_parser::v2 {
-	enum class add_argument_flags { ShortArgument, LongArgument, Positional, Position, HelpText, Action, Required, Reference };
+	enum class add_argument_flags {
+		ShortArgument,
+		LongArgument,
+		Positional,
+		Position,
+		HelpText,
+		Action,
+		Required,
+		Reference
+	};
 
 	namespace flags {
 		constexpr static inline add_argument_flags ShortArgument = add_argument_flags::ShortArgument;
@@ -30,7 +39,7 @@ namespace argument_parser::v2 {
 
 	class base_parser : private argument_parser::base_parser {
 	public:
-		template <typename T> using typed_flag_value = std::variant<std::string, parametered_action<T>, bool, int, T*>;
+		template <typename T> using typed_flag_value = std::variant<std::string, parametered_action<T>, bool, int, T *>;
 		using non_typed_flag_value = std::variant<std::string, non_parametered_action, bool, int>;
 
 		template <typename T> using typed_argument_pair = std::pair<add_argument_flags, typed_flag_value<T>>;
@@ -148,21 +157,19 @@ namespace argument_parser::v2 {
 
 			if (argument_pairs.find(add_argument_flags::Reference) != argument_pairs.end()) {
 				if (!IsTyped) {
-				    throw std::logic_error("Reference argument must be typed");
+					throw std::logic_error("Reference argument must be typed");
 				}
 
 				found_params[extended_add_argument_flags::Action] = true;
 				if constexpr (!std::is_same_v<T, void>) {
-				    auto ref = get_or_throw<T*>(argument_pairs.at(add_argument_flags::Reference), "reference");
+					auto ref = get_or_throw<T *>(argument_pairs.at(add_argument_flags::Reference), "reference");
 					if (action) {
-					    throw std::logic_error("Cannot use both action and reference for the same argument");
+						throw std::logic_error("Cannot use both action and reference for the same argument");
 					} else {
-						action = helpers::make_parametered_action<T>([ref](T const& t) {
-							*ref = t;
-						}).clone();
+						action = helpers::make_parametered_action<T>([ref](T const &t) { *ref = t; }).clone();
 					}
 				} else {
-				    throw std::logic_error("Reference argument must not be void");
+					throw std::logic_error("Reference argument must not be void");
 				}
 			}
 
@@ -187,7 +194,8 @@ namespace argument_parser::v2 {
 						}
 					}
 
-					base::add_argument(short_arg, long_arg, help_text, *static_cast<ActionType *>(&(*action)), required);
+					base::add_argument(short_arg, long_arg, help_text, *static_cast<ActionType *>(&(*action)),
+									   required);
 					break;
 				case candidate_type::store_other:
 					if (help_text.empty()) {
@@ -261,23 +269,20 @@ namespace argument_parser::v2 {
 
 			if (argument_pairs.find(add_argument_flags::Reference) != argument_pairs.end()) {
 				if (!IsTyped) {
-				    throw std::logic_error("Reference argument must be typed");
+					throw std::logic_error("Reference argument must be typed");
 				}
 
 				if constexpr (!std::is_same_v<T, void>) {
-				    auto ref = get_or_throw<T*>(argument_pairs.at(add_argument_flags::Reference), "reference");
+					auto ref = get_or_throw<T *>(argument_pairs.at(add_argument_flags::Reference), "reference");
 					if (action) {
-					    throw std::logic_error("Cannot use both action and reference for the same argument");
+						throw std::logic_error("Cannot use both action and reference for the same argument");
 					} else {
-						action = helpers::make_parametered_action<T>([ref](T const& t) {
-							*ref = t;
-						}).clone();
+						action = helpers::make_parametered_action<T>([ref](T const &t) { *ref = t; }).clone();
 					}
 				} else {
-				    throw std::logic_error("Reference argument must not be void");
+					throw std::logic_error("Reference argument must not be void");
 				}
 			}
-
 
 			if (help_text.empty()) {
 				if constexpr (IsTyped) {
@@ -297,8 +302,8 @@ namespace argument_parser::v2 {
 
 			if constexpr (IsTyped) {
 				if (action) {
-					base::add_positional_argument<T>(positional_name, help_text,
-													 *static_cast<ActionType *>(&(*action)), required, position);
+					base::add_positional_argument<T>(positional_name, help_text, *static_cast<ActionType *>(&(*action)),
+													 required, position);
 				} else {
 					base::template add_positional_argument<T>(positional_name, help_text, required, position);
 				}
