@@ -6,6 +6,8 @@
 #include <parser_v2.hpp>
 #include <string>
 #include <traits.hpp>
+#include <vector>
+#include <windows_argument_convention.hpp>
 
 using argument = argument_parser::builder::argument<>;
 
@@ -18,9 +20,7 @@ auto echo(std::string const &s) -> void {
 using namespace argument_parser::parsing_traits;
 
 constexpr hint_type vector_purpose_hint = "vector of ";
-
-template <typename T> class parser_trait<std::vector<T>> {
-public:
+template <typename T> struct parser_trait<std::vector<T>> {
 	static std::vector<T> parse(std::string const &s) {
 		std::vector<T> result;
 		std::stringstream ss(s);
@@ -96,9 +96,61 @@ auto main() -> int {
 		})
 		.build(parser);
 
-	parser.handle_arguments({&argument_parser::conventions::gnu_argument_convention});
+	auto accumulate_vec =
+		argument::start().long_argument("vecstr1").short_argument("vs1").accumulate<int>().build_and_get(parser);
 
-	std::cout << "captured value: " << captured_value << '\n';
+	parser.add_argument<std::vector<int>>({
+		{LongArgument, "accumulate"},
+		{HelpText, "accumulates given ints into the vector (flag ver)"},
+		{Accumulate, true},
+	});
+
+	std::vector<int> captured_vec;
+	parser.add_argument<std::vector<int>>({
+		{LongArgument, "accumulate2"},
+		{HelpText, "accumulates given ints into the vector (ref ver)"},
+		{Accumulate, &captured_vec},
+	});
+
+	std::vector<int> captured_vec2;
+	parser.add_argument<std::vector<int>>({
+		{LongArgument, "accumulate3"},
+		{HelpText, "accumulates given ints into the vector (ref ver)"},
+		{Accumulate, true},
+		{Reference, &captured_vec2},
+	});
+
+	parser.on_complete([](argument_parser::base_parser const &p) {
+		if (const auto value = p.get_optional<std::vector<int>>("accumulate"); value.has_value()) {
+			std::cout << "accumulate: ";
+			for (auto const &str : *value) {
+				std::cout << str << '\n';
+			}
+		}
+	});
+
+	parser.handle_arguments({&argument_parser::conventions::gnu_argument_convention,
+							 &argument_parser::conventions::windows_argument_convention});
+	if (!captured_vec.empty()) {
+		std::cout << "accumulate2: ";
+		for (auto const &str : captured_vec) {
+			std::cout << str << '\n';
+		}
+	}
+
+	if (!captured_vec2.empty()) {
+		std::cout << "accumulate3: ";
+		for (auto const &str : captured_vec2) {
+			std::cout << str << '\n';
+		}
+	}
+
+	if (accumulate_vec) {
+		std::cout << "accumulate_vec: ";
+		for (auto const &str : *accumulate_vec) {
+			std::cout << str << '\n';
+		}
+	}
 
 	return 0;
 }

@@ -10,10 +10,9 @@ namespace argument_parser::conventions::implementations {
 	parsed_argument gnu_argument_convention::get_argument(std::string const &raw) const {
 		if (starts_with(raw, long_prec()))
 			return {argument_type::LONG, raw.substr(2)};
-		else if (starts_with(raw, short_prec()))
+		if (starts_with(raw, short_prec()))
 			return {argument_type::SHORT, raw.substr(1)};
-		else
-			return {argument_type::ERROR, "GNU standard convention does not allow arguments without a preceding dash."};
+		return {argument_type::ERROR, "GNU standard convention does not allow arguments without a preceding dash."};
 	}
 
 	std::string gnu_argument_convention::extract_value(std::string const & /*raw*/) const {
@@ -42,17 +41,17 @@ namespace argument_parser::conventions::implementations {
 
 	std::pair<std::string, std::string> gnu_argument_convention::make_help_text(std::string const &short_arg,
 																				std::string const &long_arg,
-																				bool requires_value) const {
-		std::string s_part = "";
-		if (short_arg != "-" && short_arg != "") {
+																				bool const requires_value) const {
+		std::string s_part;
+		if (short_arg != "-" && !short_arg.empty()) {
 			s_part += short_prec() + short_arg;
 			if (requires_value) {
 				s_part += " <value>";
 			}
 		}
 
-		std::string l_part = "";
-		if (long_arg != "-" && long_arg != "") {
+		std::string l_part;
+		if (long_arg != "-" && !long_arg.empty()) {
 			l_part += long_prec() + long_arg;
 			if (requires_value) {
 				l_part += " <value>";
@@ -65,18 +64,17 @@ namespace argument_parser::conventions::implementations {
 
 namespace argument_parser::conventions::implementations {
 	parsed_argument gnu_equal_argument_convention::get_argument(std::string const &raw) const {
-		auto pos = raw.find('=');
-		auto arg = pos != std::string::npos ? raw.substr(0, pos) : raw;
+		const auto pos = raw.find('=');
+		const auto arg = pos != std::string::npos ? raw.substr(0, pos) : raw;
 		if (starts_with(arg, long_prec()))
 			return {argument_type::LONG, arg.substr(2)};
-		else if (starts_with(arg, short_prec()))
+		if (starts_with(arg, short_prec()))
 			return {argument_type::SHORT, arg.substr(1)};
-		else
-			return {argument_type::ERROR, "GNU standard convention does not allow arguments without a preceding dash."};
+		return {argument_type::ERROR, "GNU standard convention does not allow arguments without a preceding dash."};
 	}
 
 	std::string gnu_equal_argument_convention::extract_value(std::string const &raw) const {
-		auto pos = raw.find('=');
+		const auto pos = raw.find('=');
 		if (pos == std::string::npos || pos + 1 >= raw.size())
 			throw std::runtime_error("Expected value after '='.");
 		return raw.substr(pos + 1);
@@ -100,17 +98,17 @@ namespace argument_parser::conventions::implementations {
 
 	std::pair<std::string, std::string> gnu_equal_argument_convention::make_help_text(std::string const &short_arg,
 																					  std::string const &long_arg,
-																					  bool requires_value) const {
-		std::string s_part = "";
-		if (short_arg != "-" && short_arg != "") {
+																					  bool const requires_value) const {
+		std::string s_part;
+		if (short_arg != "-" && !short_arg.empty()) {
 			s_part += short_prec() + short_arg;
 			if (requires_value) {
 				s_part += "=<value>";
 			}
 		}
 
-		std::string l_part = "";
-		if (long_arg != "-" && long_arg != "") {
+		std::string l_part;
+		if (long_arg != "-" && !long_arg.empty()) {
 			l_part += long_prec() + long_arg;
 			if (requires_value) {
 				l_part += "=<value>";

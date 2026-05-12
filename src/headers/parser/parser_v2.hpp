@@ -2,7 +2,6 @@
 #include "traits.hpp"
 #include <argument_parser.hpp>
 #include <array>
-#include <cstdlib>
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -23,7 +22,8 @@ namespace argument_parser::v2 {
 		HelpText,
 		Action,
 		Required,
-		Reference
+		Reference,
+		Accumulate
 	};
 
 	namespace flags {
@@ -35,9 +35,27 @@ namespace argument_parser::v2 {
 		constexpr static inline add_argument_flags Positional = add_argument_flags::Positional;
 		constexpr static inline add_argument_flags Position = add_argument_flags::Position;
 		constexpr static inline add_argument_flags Reference = add_argument_flags::Reference;
+		constexpr static inline add_argument_flags Accumulate = add_argument_flags::Accumulate;
 	} // namespace flags
 
-	class base_parser : private argument_parser::base_parser {
+	namespace deducers {
+		template <typename, typename = void> struct has_value_type : std::false_type {};
+		template <typename T> struct has_value_type<T, std::void_t<typename T::value_type>> : std::true_type {};
+
+		template <typename T> struct is_vector {
+			static constexpr bool test() {
+				if constexpr (has_value_type<T>::value) {
+					return std::is_same_v<T, std::vector<typename T::value_type, typename T::allocator_type>>;
+				} else {
+					return false;
+				}
+			}
+		};
+
+		template <typename T> constexpr bool is_vector_v = is_vector<T>::test();
+	} // namespace deducers
+
+	class base_parser : argument_parser::base_parser {
 	public:
 		template <typename T> using typed_flag_value = std::variant<std::string, parametered_action<T>, bool, int, T *>;
 		using non_typed_flag_value = std::variant<std::string, non_parametered_action, bool, int>;
@@ -104,7 +122,7 @@ namespace argument_parser::v2 {
 		void prepare_help_flag(bool should_exit = true) {
 			add_argument({{flags::ShortArgument, "h"},
 						  {flags::LongArgument, "help"},
-						  {flags::Action, helpers::make_non_parametered_action([this, should_exit]() {
+						  {flags::Action, helpers::make_non_parametered_action([this, should_exit] {
 							   this->display_help(this->current_conventions());
 							   if (should_exit) {
 								   std::exit(0);
@@ -127,12 +145,13 @@ namespace argument_parser::v2 {
 			std::string short_arg, long_arg, help_text;
 			std::unique_ptr<action_base> action;
 			bool required = false;
+			bool accumulates = false;
 
-			if (argument_pairs.find(add_argument_flags::ShortArgument) != argument_pairs.end()) {
+			if (has_flag(argument_pairs, add_argument_flags::ShortArgument)) {
 				found_params[extended_add_argument_flags::ShortArgument] = true;
 				short_arg = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::ShortArgument), "short");
 			}
-			if (argument_pairs.find(add_argument_flags::LongArgument) != argument_pairs.end()) {
+			if (has_flag(argument_pairs, add_argument_flags::LongArgument)) {
 				found_params[extended_add_argument_flags::LongArgument] = true;
 				long_arg = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::LongArgument), "long");
 				if (short_arg.empty())
@@ -142,20 +161,17 @@ namespace argument_parser::v2 {
 					long_arg = "-";
 			}
 
-			if (argument_pairs.find(add_argument_flags::Action) != argument_pairs.end()) {
+			if (has_flag(argument_pairs, add_argument_flags::Action)) {
 				found_params[extended_add_argument_flags::Action] = true;
 				action = get_or_throw<ActionType>(argument_pairs.at(add_argument_flags::Action), "action").clone();
 			}
-			if (argument_pairs.find(add_argument_flags::HelpText) != argument_pairs.end()) {
-				help_text = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::HelpText), "help");
-			}
+			help_text = read_help_text(argument_pairs);
+			required = read_required(argument_pairs);
 
-			if (argument_pairs.find(add_argument_flags::Required) != argument_pairs.end() &&
-				get_or_throw<bool>(argument_pairs.at(add_argument_flags::Required), "required")) {
-				required = true;
-			}
+			bool ref_mode = false;
 
-			if (argument_pairs.find(add_argument_flags::Reference) != argument_pairs.end()) {
+			if (has_flag(argument_pairs, add_argument_flags::Reference)) {
+				ref_mode = true;
 				if (!IsTyped) {
 					throw std::logic_error("Reference argument must be typed");
 				}
@@ -165,11 +181,49 @@ namespace argument_parser::v2 {
 					auto ref = get_or_throw<T *>(argument_pairs.at(add_argument_flags::Reference), "reference");
 					if (action) {
 						throw std::logic_error("Cannot use both action and reference for the same argument");
-					} else {
-						action = helpers::make_parametered_action<T>([ref](T const &t) { *ref = t; }).clone();
 					}
+					action = make_reference_action(ref);
 				} else {
 					throw std::logic_error("Reference argument must not be void");
+				}
+			}
+
+			if (has_flag(argument_pairs, add_argument_flags::Accumulate)) {
+				if (!IsTyped)
+					throw std::logic_error("Accumulate argument must be typed");
+
+				found_params[extended_add_argument_flags::Action] = true;
+				accumulates = true;
+				if constexpr (!std::is_same_v<T, void>) {
+					if constexpr (!deducers::is_vector_v<T>) {
+						throw std::logic_error("Expected vector (type does not have value_type member)");
+					} else {
+						if (action && !ref_mode) {
+							throw std::logic_error("Cannot use both action and accumulate for the same argument");
+						}
+
+						action = make_accumulate_action<T>(argument_pairs, ref_mode, short_arg, long_arg);
+					}
+				} else {
+					throw std::logic_error("Accumulate argument must not be void");
+				}
+			}
+
+			if (accumulates) {
+				if constexpr (!std::is_same_v<T, void> && deducers::is_vector_v<T>) {
+					if (suggest_candidate(found_params) == candidate_type::unknown) {
+						throw std::runtime_error(
+							"Could not match any add argument overload to given parameters. Are you "
+							"missing some required parameter?");
+					}
+					if (help_text.empty()) {
+						help_text = "Accepts repeated values.";
+					}
+
+					base::add_argument<typename T::value_type>(
+						short_arg, long_arg, help_text,
+						*static_cast<parametered_action<typename T::value_type> *>(&(*action)), required);
+					return;
 				}
 			}
 
@@ -238,49 +292,64 @@ namespace argument_parser::v2 {
 				default:
 					throw std::runtime_error(
 						"Could not match the arguments against any overload. The suggested candidate was: " +
-						std::to_string((int(suggested_add))));
+						std::to_string(static_cast<int>(suggested_add)));
 				}
 			}
 		}
 
 		template <bool IsTyped, typename ActionType, typename T, typename ArgsMap>
 		void add_positional_argument_impl(ArgsMap const &argument_pairs) {
-			std::string positional_name =
+			auto positional_name =
 				get_or_throw<std::string>(argument_pairs.at(add_argument_flags::Positional), "positional");
 
-			std::string help_text;
 			std::unique_ptr<action_base> action;
 			bool required = false;
-			std::optional<int> position = std::nullopt;
+			bool ref_mode = false;
+			bool accumulates = false;
 
-			if (argument_pairs.find(add_argument_flags::Action) != argument_pairs.end()) {
+			if (has_flag(argument_pairs, add_argument_flags::Action)) {
 				action = get_or_throw<ActionType>(argument_pairs.at(add_argument_flags::Action), "action").clone();
 			}
-			if (argument_pairs.find(add_argument_flags::HelpText) != argument_pairs.end()) {
-				help_text = get_or_throw<std::string>(argument_pairs.at(add_argument_flags::HelpText), "help");
-			}
-			if (argument_pairs.find(add_argument_flags::Required) != argument_pairs.end() &&
-				get_or_throw<bool>(argument_pairs.at(add_argument_flags::Required), "required")) {
-				required = true;
-			}
-			if (argument_pairs.find(add_argument_flags::Position) != argument_pairs.end()) {
-				position = get_or_throw<int>(argument_pairs.at(add_argument_flags::Position), "position");
-			}
+			std::string help_text = read_help_text(argument_pairs);
+			required = read_required(argument_pairs);
+			std::optional<int> position = read_position(argument_pairs);
 
-			if (argument_pairs.find(add_argument_flags::Reference) != argument_pairs.end()) {
+			if (has_flag(argument_pairs, add_argument_flags::Reference)) {
+				ref_mode = true;
 				if (!IsTyped) {
 					throw std::logic_error("Reference argument must be typed");
 				}
 
 				if constexpr (!std::is_same_v<T, void>) {
-					auto ref = get_or_throw<T *>(argument_pairs.at(add_argument_flags::Reference), "reference");
-					if (action) {
-						throw std::logic_error("Cannot use both action and reference for the same argument");
-					} else {
-						action = helpers::make_parametered_action<T>([ref](T const &t) { *ref = t; }).clone();
+					if (!has_flag(argument_pairs, add_argument_flags::Accumulate)) {
+						auto ref = get_or_throw<T *>(argument_pairs.at(add_argument_flags::Reference), "reference");
+						if (action) {
+							throw std::logic_error("Cannot use both action and reference for the same argument");
+						}
+
+						action = make_reference_action(ref);
 					}
 				} else {
 					throw std::logic_error("Reference argument must not be void");
+				}
+			}
+
+			if (has_flag(argument_pairs, add_argument_flags::Accumulate)) {
+				if (!IsTyped)
+					throw std::logic_error("Accumulate positional argument must be typed");
+
+				accumulates = true;
+				if constexpr (!std::is_same_v<T, void>) {
+					if constexpr (!deducers::is_vector_v<T>) {
+						throw std::logic_error("Expected vector (type does not have value_type member)");
+					} else {
+						if (action && !ref_mode) {
+							throw std::logic_error("Cannot use both action and accumulate for the same argument");
+						}
+						action = make_accumulate_action<T>(argument_pairs, ref_mode, positional_name);
+					}
+				} else {
+					throw std::logic_error("Accumulate argument must not be void");
 				}
 			}
 
@@ -300,15 +369,24 @@ namespace argument_parser::v2 {
 				}
 			}
 
+			if (accumulates) {
+				if constexpr (!std::is_same_v<T, void> && deducers::is_vector_v<T>) {
+					base::add_positional_accumulator<typename T::value_type>(
+						positional_name, help_text,
+						*static_cast<parametered_action<typename T::value_type> *>(&(*action)), required, position);
+					return;
+				}
+			}
+
 			if constexpr (IsTyped) {
 				if (action) {
 					base::add_positional_argument<T>(positional_name, help_text, *static_cast<ActionType *>(&(*action)),
 													 required, position);
 				} else {
-					base::template add_positional_argument<T>(positional_name, help_text, required, position);
+					base::add_positional_argument<T>(positional_name, help_text, required, position);
 				}
 			} else {
-				base::template add_positional_argument<std::string>(positional_name, help_text, required, position);
+				base::add_positional_argument<std::string>(positional_name, help_text, required, position);
 			}
 		}
 
@@ -319,11 +397,7 @@ namespace argument_parser::v2 {
 
 		template <typename T, size_t S>
 		bool satisfies_at_least_one(std::array<T, S> const &arr, std::unordered_map<T, bool> const &map) {
-			for (const auto &req : arr) {
-				if (map.find(req) != map.end())
-					return true;
-			}
-			return false;
+			return std::any_of(arr.begin(), arr.end(), [&map](T const &entry) { return map.find(entry) != map.end(); });
 		}
 
 		candidate_type suggest_candidate(std::unordered_map<extended_add_argument_flags, bool> const &available_vars) {
@@ -335,13 +409,149 @@ namespace argument_parser::v2 {
 			if (available_vars.find(extended_add_argument_flags::Action) != available_vars.end()) {
 				if (available_vars.at(extended_add_argument_flags::IsTyped))
 					return candidate_type::typed_action;
-				else
-					return candidate_type::non_typed_action;
+				return candidate_type::non_typed_action;
 			}
 
 			if (available_vars.at(extended_add_argument_flags::IsTyped))
 				return candidate_type::store_other;
 			return candidate_type::store_boolean;
+		}
+
+		template <typename ArgsMap> static bool has_flag(ArgsMap const &argument_pairs, add_argument_flags flag) {
+			return argument_pairs.find(flag) != argument_pairs.end();
+		}
+
+		template <typename ArgsMap> std::string read_help_text(ArgsMap const &argument_pairs) {
+			if (has_flag(argument_pairs, add_argument_flags::HelpText)) {
+				return get_or_throw<std::string>(argument_pairs.at(add_argument_flags::HelpText), "help");
+			}
+			return "";
+		}
+
+		template <typename ArgsMap> bool read_required(ArgsMap const &argument_pairs) {
+			return has_flag(argument_pairs, add_argument_flags::Required) &&
+				   get_or_throw<bool>(argument_pairs.at(add_argument_flags::Required), "required");
+		}
+
+		template <typename ArgsMap> std::optional<int> read_position(ArgsMap const &argument_pairs) {
+			if (has_flag(argument_pairs, add_argument_flags::Position)) {
+				return get_or_throw<int>(argument_pairs.at(add_argument_flags::Position), "position");
+			}
+			return std::nullopt;
+		}
+
+		template <typename T, typename T2, typename I>
+		std::variant<T, T2> get_either_or_throw(typed_flag_value<I> const &v, std::string_view key) {
+			if (auto p = std::get_if<T>(&v))
+				return *p;
+			if (auto p = std::get_if<T2>(&v))
+				return *p;
+			throw std::invalid_argument(std::string("variant type mismatch for key: ") + std::string(key));
+		}
+
+		template <typename T> std::unique_ptr<action_base> make_reference_action(T *target) {
+			return helpers::make_parametered_action<T>([target](T const &value) { *target = value; }).clone();
+		}
+
+		template <typename Vector> std::unique_ptr<action_base> make_accumulate_ref_action(Vector *target) {
+			using Value = typename Vector::value_type;
+			return helpers::make_parametered_action<Value>(
+					   [target](Value const &value) { target->emplace_back(value); })
+				.clone();
+		}
+
+		template <typename Vector>
+		void store_accumulated_on_complete(std::string short_arg, std::string long_arg,
+										   std::shared_ptr<Vector> accumulation_target) {
+			on_complete(
+				[this, short_arg = std::move(short_arg), long_arg = std::move(long_arg),
+				 accumulation_target](auto const &) {
+					if (accumulation_target->empty()) {
+						return;
+					}
+
+					const auto sid = this->find_argument_id(short_arg);
+					const auto lid = this->find_argument_id(long_arg);
+
+					if (const auto id = sid ? *sid : (lid ? *lid : -1); id != -1) {
+						this->ref_stored_arguments()[id] = *accumulation_target;
+					}
+				},
+				true);
+		}
+
+		template <typename Vector>
+		void store_accumulated_on_complete(std::string positional_name, std::shared_ptr<Vector> accumulation_target) {
+			on_complete(
+				[this, positional_name = std::move(positional_name), accumulation_target](auto const &) {
+					if (accumulation_target->empty()) {
+						return;
+					}
+
+					auto id = this->find_argument_id(positional_name);
+					if (id.has_value()) {
+						this->ref_stored_arguments()[*id] = *accumulation_target;
+					}
+				},
+				true);
+		}
+
+		template <typename Vector, typename ArgsMap>
+		std::unique_ptr<action_base> make_accumulate_action(ArgsMap const &argument_pairs, bool ref_mode,
+															std::string const &short_arg, std::string const &long_arg) {
+			if (ref_mode) {
+				auto ref = get_or_throw<Vector *>(argument_pairs.at(add_argument_flags::Reference), "reference");
+				return make_accumulate_ref_action(ref);
+			}
+
+			auto accumulate =
+				get_either_or_throw<Vector *, bool>(argument_pairs.at(add_argument_flags::Accumulate), "accumulate");
+
+			return std::visit(
+				[this, short_arg, long_arg](auto &&acc) -> std::unique_ptr<action_base> {
+					using V = std::decay_t<decltype(acc)>;
+					if constexpr (std::is_same_v<V, bool>) {
+						if (!acc) {
+							throw std::logic_error("Accumulate flag must be true when used as a bool");
+						}
+
+						auto accumulation_target = std::make_shared<Vector>();
+						store_accumulated_on_complete(short_arg, long_arg, accumulation_target);
+						return make_accumulate_ref_action(accumulation_target.get());
+					} else {
+						return make_accumulate_ref_action(acc);
+					}
+				},
+				accumulate);
+		}
+
+		template <typename Vector, typename ArgsMap>
+		std::unique_ptr<action_base> make_accumulate_action(ArgsMap const &argument_pairs, bool ref_mode,
+															std::string const &positional_name) {
+			if (ref_mode) {
+				auto ref = get_or_throw<Vector *>(argument_pairs.at(add_argument_flags::Reference), "reference");
+				return make_accumulate_ref_action(ref);
+			}
+
+			auto accumulate =
+				get_either_or_throw<Vector *, bool>(argument_pairs.at(add_argument_flags::Accumulate), "accumulate");
+
+			return std::visit(
+				[this, positional_name](auto &&acc) -> std::unique_ptr<action_base> {
+					using V = std::decay_t<decltype(acc)>;
+					if constexpr (std::is_same_v<V, bool>) {
+						if (!acc) {
+							throw std::logic_error("Accumulate flag must be true when used as a bool");
+						}
+
+						auto accumulation_target = std::make_shared<Vector>();
+						store_accumulated_on_complete(positional_name, accumulation_target);
+						return make_accumulate_ref_action(accumulation_target.get());
+					} else {
+						return make_accumulate_ref_action(acc);
+					}
+				},
+				accumulate);
 		}
 
 		template <typename T, typename I> T get_or_throw(typed_flag_value<I> const &v, std::string_view key) {

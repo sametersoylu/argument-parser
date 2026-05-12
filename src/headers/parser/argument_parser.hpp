@@ -1,3 +1,5 @@
+// ReSharper disable CppFunctionIsNotImplemented
+// ReSharper disable All
 #pragma once
 #ifndef ARGUMENT_PARSER_HPP
 #define ARGUMENT_PARSER_HPP
@@ -64,9 +66,9 @@ namespace argument_parser {
 			copyable_atomic &operator=(copyable_atomic &&other) noexcept = default;
 			~copyable_atomic() = default;
 
-			T operator=(T desired) noexcept {
+			copyable_atomic& operator=(T desired) noexcept {
 				store(desired);
-				return desired;
+				return *this;
 			}
 
 			operator T() const noexcept {
@@ -79,7 +81,7 @@ namespace argument_parser {
 				}
 			}
 
-			T load(std::memory_order order = std::memory_order_seq_cst) const noexcept {
+			[[nodiscard]] T load(std::memory_order order = std::memory_order_seq_cst) const noexcept {
 				return value ? value->load(order) : T{};
 			}
 
@@ -124,7 +126,7 @@ namespace argument_parser {
 				T parsed_value = parsing_traits::parser_trait<T>::parse(param);
 				parse_success = true;
 				invoke(parsed_value);
-			} catch (const std::runtime_error &e) {
+			} catch (const std::runtime_error &_) {
 				if (!parse_success) {
 					auto [format_hint, purpose_hint] = get_trait_hints();
 					if (purpose_hint.empty())
@@ -203,6 +205,7 @@ namespace argument_parser {
 		[[nodiscard]] bool expects_parameter() const;
 		[[nodiscard]] std::string get_help_text() const;
 		[[nodiscard]] bool is_positional() const;
+		[[nodiscard]] bool is_positional_accumulator() const;
 		[[nodiscard]] std::optional<int> get_position_index() const;
 
 	private:
@@ -210,6 +213,7 @@ namespace argument_parser {
 		void set_invoked(bool val);
 		void set_help_text(std::string const &text);
 		void set_positional(bool val);
+		void set_positional_accumulator(bool val);
 		void set_position_index(std::optional<int> idx);
 
 		friend class base_parser;
@@ -221,6 +225,7 @@ namespace argument_parser {
 		bool invoked;
 		std::string help_text;
 		bool positional = false;
+		bool positional_accumulator = false;
 		std::optional<int> position_index = std::nullopt;
 	};
 
@@ -279,6 +284,13 @@ namespace argument_parser {
 			base_add_positional_argument<T>(name, help_text, required, position);
 		}
 
+		template <typename T>
+		void add_positional_accumulator(std::string const &name, std::string const &help_text,
+										parametered_action<T> const &action, bool required,
+										std::optional<int> position = std::nullopt) {
+			base_add_positional_argument(name, help_text, action, required, position, true);
+		}
+
 		void on_complete(std::function<void(base_parser const &)> const &action);
 
 		template <typename T> std::optional<T> get_optional(std::string const &arg) const {
@@ -317,28 +329,39 @@ namespace argument_parser {
 			return _current_conventions;
 		}
 
+		std::unordered_map<int, std::any> &ref_stored_arguments() {
+			return stored_arguments;
+		}
+
+		void on_complete(std::function<void(base_parser const &)> const &handler, bool to_start);
+
 	private:
+		struct found_argument {
+			std::string key;
+			argument arg;
+			std::optional<std::string> value = std::nullopt;
+		};
+
 		bool test_conventions(std::initializer_list<conventions::convention const *const> convention_types,
-							  std::unordered_map<std::string, std::string> &values_for_arguments,
-							  std::vector<std::pair<std::string, argument>> &found_arguments,
+							  std::vector<found_argument> &found_arguments,
 							  std::optional<argument> &found_help, std::vector<std::string>::iterator &it,
 							  std::stringstream &error_stream);
 		void extract_arguments(std::initializer_list<conventions::convention const *const> convention_types,
-							   std::unordered_map<std::string, std::string> &values_for_arguments,
-							   std::vector<std::pair<std::string, argument>> &found_arguments,
+							   std::vector<found_argument> &found_arguments,
 							   std::optional<argument> &found_help);
 
-		void invoke_arguments(std::unordered_map<std::string, std::string> const &values_for_arguments,
-							  std::vector<std::pair<std::string, argument>> &found_arguments,
+		void invoke_arguments(std::vector<found_argument> &found_arguments,
 							  std::optional<argument> const &found_help);
-		void enforce_creation_thread();
+		void enforce_creation_thread() const;
 
 		void assert_argument_not_exist(std::string const &short_arg, std::string const &long_arg) const;
 		void assert_positional_not_exist(std::string const &name) const;
+		void assert_can_place_positional(int id, std::optional<int> position, bool accumulator) const;
 		static void set_argument_status(bool is_required, std::string const &help_text, argument &arg);
 		void place_argument(int id, argument const &arg, std::string const &short_arg, std::string const &long_arg);
 		void place_positional_argument(int id, argument const &arg, std::string const &name,
-									   std::optional<int> position);
+									   std::optional<int> position, bool accumulator = false);
+		[[nodiscard]] std::optional<size_t> next_positional_slot(size_t start) const;
 
 		template <typename ActionType>
 		void base_add_argument(std::string const &short_arg, std::string const &long_arg, std::string const &help_text,
@@ -373,14 +396,15 @@ namespace argument_parser {
 		template <typename ActionType>
 		void base_add_positional_argument(std::string const &name, std::string const &help_text,
 										  ActionType const &action, bool required,
-										  std::optional<int> position = std::nullopt) {
+										  std::optional<int> position = std::nullopt, bool accumulator = false) {
 			assert_positional_not_exist(name);
 			int id = id_counter.fetch_add(1);
 			argument arg(id, name, action);
 			set_argument_status(required, help_text, arg);
 			arg.set_positional(true);
+			arg.set_positional_accumulator(accumulator);
 			arg.set_position_index(position);
-			place_positional_argument(id, arg, name, position);
+			place_positional_argument(id, arg, name, position, accumulator);
 		}
 
 		template <typename StoreType>

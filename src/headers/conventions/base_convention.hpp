@@ -14,15 +14,15 @@ namespace argument_parser::conventions {
 
 	class base_convention {
 	public:
-		virtual std::string extract_value(std::string const &) const = 0;
-		virtual parsed_argument get_argument(std::string const &) const = 0;
-		virtual bool requires_next_token() const = 0;
-		virtual std::string name() const = 0;
-		virtual std::string short_prec() const = 0;
-		virtual std::string long_prec() const = 0;
-		virtual std::pair<std::string, std::string>
+		[[nodiscard]] virtual std::string extract_value(std::string const &) const = 0;
+		[[nodiscard]] virtual parsed_argument get_argument(std::string const &) const = 0;
+		[[nodiscard]] virtual bool requires_next_token() const = 0;
+		[[nodiscard]] virtual std::string name() const = 0;
+		[[nodiscard]] virtual std::string short_prec() const = 0;
+		[[nodiscard]] virtual std::string long_prec() const = 0;
+		[[nodiscard]] virtual std::pair<std::string, std::string>
 		make_help_text(std::string const &short_arg, std::string const &long_arg, bool requires_value) const = 0;
-		virtual std::vector<convention_features> get_features() const = 0;
+		[[nodiscard]] virtual std::vector<convention_features> get_features() const = 0;
 
 	protected:
 		base_convention() = default;

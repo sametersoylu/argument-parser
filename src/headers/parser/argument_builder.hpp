@@ -2,6 +2,7 @@
 
 #include "argument_parser.hpp"
 #include <functional>
+#include <memory>
 #include <parser_v2.hpp>
 #include <type_traits>
 
@@ -14,7 +15,15 @@ namespace argument_parser::builder {
 	namespace builder_mask {
 		using v2_flag = argument_parser::v2::add_argument_flags;
 		using mask_type = std::uint64_t;
-		enum class value_mode { unresolved, store, flag, reference, nonparametered_action, parametered_action };
+		enum class value_mode {
+			unresolved,
+			store,
+			flag,
+			reference,
+			accumulate,
+			nonparametered_action,
+			parametered_action
+		};
 
 		enum class extra_capability : unsigned { Store = static_cast<unsigned>(v2_flag::Reference) + 1, Flag };
 
@@ -34,12 +43,13 @@ namespace argument_parser::builder {
 		constexpr mask_type action = bit(v2_flag::Action);
 		constexpr mask_type required = bit(v2_flag::Required);
 		constexpr mask_type reference = bit(v2_flag::Reference);
+		constexpr mask_type accumulate = bit(v2_flag::Accumulate);
 		constexpr mask_type store = bit(extra_capability::Store);
 		constexpr mask_type flag = bit(extra_capability::Flag);
 
-		constexpr mask_type value_mode_group = action | reference | store | flag;
-		constexpr mask_type initial =
-			short_argument | long_argument | positional | help_text | action | required | reference | store | flag;
+		constexpr mask_type value_mode_group = action | reference | accumulate | store | flag;
+		constexpr mask_type initial = short_argument | long_argument | positional | help_text | action | required |
+									  reference | accumulate | store | flag;
 
 		constexpr auto has(mask_type mask, mask_type capability) -> bool {
 			return (mask & capability) == capability;
@@ -61,6 +71,39 @@ namespace argument_parser::builder {
 			return has_selected_identifier(mask);
 		}
 	} // namespace builder_mask
+
+	template <typename store_type> class container {
+	public:
+		store_type get() const {
+			return m_container.get();
+		}
+
+		store_type &operator*() {
+			return m_container.operator*();
+		}
+
+		store_type *operator->() {
+			return m_container.operator->();
+		}
+
+		operator bool() {
+			return m_container.operator bool();
+		}
+
+	private:
+		container() = default;
+		explicit container(store_type *ptr) {
+			m_container = std::shared_ptr<store_type>(ptr, [](store_type *) {
+				/* noop. we don't own this reference, so it is not ours to free, but still use std::shared_ptr to manage
+				 * it. */
+			});
+		}
+		void set_container(store_type const &container) {
+			m_container = std::make_shared<store_type>(container);
+		}
+		std::shared_ptr<store_type> m_container;
+		template <builder_mask::mask_type mask, typename __store_type> friend class argument;
+	};
 
 	template <builder_mask::mask_type mask = builder_mask::initial, typename store_type = non_type> class argument {
 	public:
@@ -169,6 +212,34 @@ namespace argument_parser::builder {
 			return next;
 		}
 
+		template <typename T = std::string, mask_type current_mask = mask,
+				  std::enable_if_t<builder_mask::has(current_mask, builder_mask::accumulate), int> = 0>
+		auto accumulate() const
+			-> argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), std::vector<T>> {
+			using vector_type = std::vector<T>;
+			using next_argument =
+				argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), vector_type>;
+
+			next_argument next{*this};
+			next.m_value_mode = value_mode::accumulate;
+			return next;
+		}
+
+		template <mask_type current_mask = mask,
+				  std::enable_if_t<builder_mask::has(current_mask, builder_mask::accumulate), int> = 0, typename T>
+		auto accumulate(T &value) const
+			-> argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), T> {
+			static_assert(argument_parser::v2::deducers::is_vector_v<T>,
+						  "accumulate(target) requires a std::vector target.");
+
+			using next_argument = argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), T>;
+
+			next_argument next{*this};
+			next.m_reference = std::addressof(value);
+			next.m_value_mode = value_mode::accumulate;
+			return next;
+		}
+
 		template <mask_type current_mask = mask,
 				  std::enable_if_t<builder_mask::has(current_mask, builder_mask::flag), int> = 0>
 		auto flag() const -> argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), bool> {
@@ -246,6 +317,12 @@ namespace argument_parser::builder {
 					return;
 				}
 				break;
+			case value_mode::accumulate:
+				if constexpr (!std::is_same_v<store_type, non_type>) {
+					build_accumulate(parser);
+					return;
+				}
+				break;
 			case value_mode::parametered_action:
 				if constexpr (!std::is_same_v<store_type, non_type>) {
 					build_parametered_action(parser);
@@ -264,6 +341,35 @@ namespace argument_parser::builder {
 			throw std::logic_error("The builder reached build() without a supported terminal value mode.");
 		}
 
+		template <mask_type current_mask = mask, std::enable_if_t<builder_mask::is_buildable(current_mask), int> = 0>
+		auto build_and_get(argument_parser::v2::base_parser &parser) const -> container<store_type> {
+			assert_has_identifier();
+			switch (m_value_mode) {
+			case value_mode::store:
+			case value_mode::flag:
+			case value_mode::unresolved:
+			case value_mode::accumulate:
+				build(parser);
+				break;
+			default:
+				throw std::logic_error("The builder reached build() without a supported terminal value mode.");
+			}
+
+			if (m_value_mode == value_mode::accumulate && m_reference != nullptr) {
+				return container(m_reference);
+			}
+
+			std::string lk = lookup_key();
+			container<store_type> container;
+			parser.on_complete([lk, &container](base_parser const &p) {
+				auto value = p.get_optional<store_type>(lk);
+				if (value.has_value()) {
+					container.set_container(*value);
+				}
+			});
+			return container;
+		}
+
 	private:
 		argument() = default;
 
@@ -276,9 +382,9 @@ namespace argument_parser::builder {
 
 		template <typename T>
 		using typed_map =
-			std::unordered_map<v2_flag, typename argument_parser::v2::base_parser::template typed_flag_value<T>>;
+			std::unordered_map<v2_flag, v2::base_parser::typed_flag_value<T>>;
 
-		using non_typed_map = std::unordered_map<v2_flag, argument_parser::v2::base_parser::non_typed_flag_value>;
+		using non_typed_map = std::unordered_map<v2_flag, v2::base_parser::non_typed_flag_value>;
 
 		auto is_positional() const -> bool {
 			return !m_positional_name.empty();
@@ -359,13 +465,22 @@ namespace argument_parser::builder {
 		auto build_reference(argument_parser::v2::base_parser &parser) const -> void {
 			auto pairs = make_typed_pairs<store_type>();
 			auto *target = m_reference;
-			auto key = lookup_key();
 
 			if (target == nullptr) {
 				throw std::logic_error("reference() was selected without a target.");
 			}
 
 			pairs[argument_parser::v2::flags::Reference] = target;
+			parser.template add_argument<store_type>(pairs);
+		}
+
+		auto build_accumulate(argument_parser::v2::base_parser &parser) const -> void {
+			auto pairs = make_typed_pairs<store_type>();
+			if (m_reference != nullptr) {
+				pairs[argument_parser::v2::flags::Accumulate] = m_reference;
+			} else {
+				pairs[argument_parser::v2::flags::Accumulate] = true;
+			}
 			parser.template add_argument<store_type>(pairs);
 		}
 

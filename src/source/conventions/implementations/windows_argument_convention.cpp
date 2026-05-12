@@ -3,15 +3,14 @@
 #include <stdexcept>
 
 namespace argument_parser::conventions::implementations {
-	windows_argument_convention::windows_argument_convention(bool accept_dash) : accept_dash_(accept_dash) {}
+	windows_argument_convention::windows_argument_convention(bool const accept_dash) : accept_dash_(accept_dash) {}
 
 	parsed_argument windows_argument_convention::get_argument(std::string const &raw) const {
 		if (raw.empty()) {
 			return {argument_type::ERROR, "Empty argument token."};
 		}
 		const char c0 = raw[0];
-		const bool ok_prefix = (c0 == '/') || (accept_dash_ && c0 == '-');
-		if (!ok_prefix) {
+		if (const bool ok_prefix = (c0 == '/') || (accept_dash_ && c0 == '-'); !ok_prefix) {
 			return {argument_type::ERROR,
 					accept_dash_ ? "Windows-style expects options to start with '/' (or '-' in compat mode)."
 								 : "Windows-style expects options to start with '/'."};
@@ -52,17 +51,17 @@ namespace argument_parser::conventions::implementations {
 
 	std::pair<std::string, std::string> windows_argument_convention::make_help_text(std::string const &short_arg,
 																					std::string const &long_arg,
-																					bool requires_value) const {
-		std::string s_part = "";
-		if (short_arg != "-" && short_arg != "") {
+																					bool const requires_value) const {
+		std::string s_part;
+		if (short_arg != "-" && !short_arg.empty()) {
 			s_part += short_prec() + short_arg;
 			if (requires_value) {
 				s_part += " <value>";
 			}
 		}
 
-		std::string l_part = "";
-		if (long_arg != "-" && long_arg != "") {
+		std::string l_part;
+		if (long_arg != "-" && !long_arg.empty()) {
 			l_part += long_prec() + long_arg;
 			if (requires_value) {
 				l_part += " <value>";
@@ -79,15 +78,14 @@ namespace argument_parser::conventions::implementations {
 } // namespace argument_parser::conventions::implementations
 
 namespace argument_parser::conventions::implementations {
-	windows_kv_argument_convention::windows_kv_argument_convention(bool accept_dash) : accept_dash_(accept_dash) {}
+	windows_kv_argument_convention::windows_kv_argument_convention(bool const accept_dash) : accept_dash_(accept_dash) {}
 
 	parsed_argument windows_kv_argument_convention::get_argument(std::string const &raw) const {
 		if (raw.empty()) {
 			return {argument_type::ERROR, "Empty argument token."};
 		}
 		const char c0 = raw[0];
-		const bool ok_prefix = (c0 == '/') || (accept_dash_ && c0 == '-');
-		if (!ok_prefix) {
+		if (const bool ok_prefix = (c0 == '/') || (accept_dash_ && c0 == '-'); !ok_prefix) {
 			return {argument_type::ERROR,
 					accept_dash_ ? "Windows-style expects options to start with '/' (or '-' in compat mode)."
 								 : "Windows-style expects options to start with '/'."};
@@ -131,17 +129,17 @@ namespace argument_parser::conventions::implementations {
 
 	std::pair<std::string, std::string> windows_kv_argument_convention::make_help_text(std::string const &short_arg,
 																					   std::string const &long_arg,
-																					   bool requires_value) const {
-		std::string s_part = "";
-		if (short_arg != "-" && short_arg != "") {
+																					   bool const requires_value) const {
+		std::string s_part;
+		if (short_arg != "-" && !short_arg.empty()) {
 			s_part += short_prec() + short_arg;
 			if (requires_value) {
 				s_part += "=<value>, " + short_prec() + short_arg + ":<value>";
 			}
 		}
 
-		std::string l_part = "";
-		if (long_arg != "-" && long_arg != "") {
+		std::string l_part;
+		if (long_arg != "-" && !long_arg.empty()) {
 			l_part += long_prec() + long_arg;
 			if (requires_value) {
 				l_part += "=<value>, " + long_prec() + long_arg + ":<value>";

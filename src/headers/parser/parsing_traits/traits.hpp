@@ -1,3 +1,4 @@
+// ReSharper disable CppFunctionIsNotImplemented
 #pragma once
 #ifndef PARSING_TRAITS_HPP
 #define PARSING_TRAITS_HPP
@@ -61,10 +62,10 @@ namespace argument_parser::parsing_traits {
 			constexpr size_t total_len = (std::string_view{Providers::value}.length() + ... + 0);
 
 			std::array<char, total_len + 1> arr{};
+			// ReSharper disable once CppDFAUnreadVariable
 			size_t offset = 0;
-
-			auto append = [&](hint_type s) {
-				std::string_view sv{s};
+			auto append = [&](const hint_type s) {
+				const std::string_view sv{s};
 				for (char c : sv)
 					arr[offset++] = c;
 				return 0;
