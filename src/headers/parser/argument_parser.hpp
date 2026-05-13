@@ -66,7 +66,7 @@ namespace argument_parser {
 			copyable_atomic &operator=(copyable_atomic &&other) noexcept = default;
 			~copyable_atomic() = default;
 
-			copyable_atomic& operator=(T desired) noexcept {
+			copyable_atomic &operator=(T desired) noexcept {
 				store(desired);
 				return *this;
 			}
@@ -104,9 +104,9 @@ namespace argument_parser {
 		[[nodiscard]] virtual std::unique_ptr<action_base> clone() const = 0;
 	};
 
-	template <typename T> class parametered_action : public action_base {
+	template <typename T> class action_with_param : public action_base {
 	public:
-		explicit parametered_action(std::function<void(const T &)> const &handler) : handler(handler) {}
+		explicit action_with_param(std::function<void(const T &)> const &handler) : handler(handler) {}
 		using parameter_type = T;
 		void invoke(const T &arg) const {
 			handler(arg);
@@ -149,16 +149,16 @@ namespace argument_parser {
 		}
 
 		[[nodiscard]] std::unique_ptr<action_base> clone() const override {
-			return std::make_unique<parametered_action<T>>(handler);
+			return std::make_unique<action_with_param<T>>(handler);
 		}
 
 	private:
 		std::function<void(const T &)> handler;
 	};
 
-	class non_parametered_action : public action_base {
+	class action_no_param : public action_base {
 	public:
-		explicit non_parametered_action(std::function<void()> const &handler) : handler(handler) {}
+		explicit action_no_param(std::function<void()> const &handler) : handler(handler) {}
 
 		void invoke() const override {
 			handler();
@@ -177,7 +177,7 @@ namespace argument_parser {
 		}
 
 		[[nodiscard]] std::unique_ptr<action_base> clone() const override {
-			return std::make_unique<non_parametered_action>(handler);
+			return std::make_unique<action_no_param>(handler);
 		}
 
 	private:
@@ -230,15 +230,26 @@ namespace argument_parser {
 	};
 
 	namespace helpers {
-		template <typename T>
-		static parametered_action<T> make_parametered_action(std::function<void(const T &)> const &function) {
-			return parametered_action<T>(function);
+		template <typename T> static action_with_param<T> make_action(std::function<void(const T &)> const &function) {
+			return action_with_param<T>(function);
 		}
 
-		static non_parametered_action make_non_parametered_action(std::function<void()> const &function) {
-			return non_parametered_action(function);
+		static action_no_param make_action(std::function<void()> const &function) {
+			return action_no_param(function);
 		}
 	} // namespace helpers
+
+	struct parser_settings {
+		bool should_exit_on_error = true;
+		bool should_exit_on_missing_required = true;
+		bool should_exit_on_unknown_argument = true;
+		bool should_exit_on_help = true;
+
+		bool ignore_unknown_arguments = false;
+		bool ignore_errors = false;
+	};
+
+	constexpr static inline parser_settings no_exit{false, false, false, false};
 
 	/**
 	 * @brief Base class for parsing arguments from the command line.
@@ -251,7 +262,7 @@ namespace argument_parser {
 	public:
 		template <typename T>
 		void add_argument(std::string const &short_arg, std::string const &long_arg, std::string const &help_text,
-						  parametered_action<T> const &action, bool required) {
+						  action_with_param<T> const &action, bool required) {
 			base_add_argument(short_arg, long_arg, help_text, action, required);
 		}
 
@@ -262,7 +273,7 @@ namespace argument_parser {
 		}
 
 		void add_argument(std::string const &short_arg, std::string const &long_arg, std::string const &help_text,
-						  non_parametered_action const &action, bool required) {
+						  action_no_param const &action, bool required) {
 			base_add_argument(short_arg, long_arg, help_text, action, required);
 		}
 
@@ -273,7 +284,7 @@ namespace argument_parser {
 
 		template <typename T>
 		void add_positional_argument(std::string const &name, std::string const &help_text,
-									 parametered_action<T> const &action, bool required,
+									 action_with_param<T> const &action, bool required,
 									 std::optional<int> position = std::nullopt) {
 			base_add_positional_argument(name, help_text, action, required, position);
 		}
@@ -286,7 +297,7 @@ namespace argument_parser {
 
 		template <typename T>
 		void add_positional_accumulator(std::string const &name, std::string const &help_text,
-										parametered_action<T> const &action, bool required,
+										action_with_param<T> const &action, bool required,
 										std::optional<int> position = std::nullopt) {
 			base_add_positional_argument(name, help_text, action, required, position, true);
 		}
@@ -335,7 +346,12 @@ namespace argument_parser {
 
 		void on_complete(std::function<void(base_parser const &)> const &handler, bool to_start);
 
+		void set_settings(parser_settings const &settings) {
+			m_settings = settings;
+		}
+
 	private:
+		parser_settings m_settings;
 		struct found_argument {
 			std::string key;
 			argument arg;
@@ -343,15 +359,12 @@ namespace argument_parser {
 		};
 
 		bool test_conventions(std::initializer_list<conventions::convention const *const> convention_types,
-							  std::vector<found_argument> &found_arguments,
-							  std::optional<argument> &found_help, std::vector<std::string>::iterator &it,
-							  std::stringstream &error_stream);
+							  std::vector<found_argument> &found_arguments, std::optional<argument> &found_help,
+							  std::vector<std::string>::iterator &it, std::stringstream &error_stream);
 		void extract_arguments(std::initializer_list<conventions::convention const *const> convention_types,
-							   std::vector<found_argument> &found_arguments,
-							   std::optional<argument> &found_help);
+							   std::vector<found_argument> &found_arguments, std::optional<argument> &found_help);
 
-		void invoke_arguments(std::vector<found_argument> &found_arguments,
-							  std::optional<argument> const &found_help);
+		void invoke_arguments(std::vector<found_argument> &found_arguments, std::optional<argument> const &found_help);
 		void enforce_creation_thread() const;
 
 		void assert_argument_not_exist(std::string const &short_arg, std::string const &long_arg) const;
@@ -379,13 +392,12 @@ namespace argument_parser {
 			assert_argument_not_exist(short_arg, long_arg);
 			int id = id_counter.fetch_add(1);
 			if constexpr (std::is_same_v<StoreType, void>) {
-				auto action =
-					helpers::make_non_parametered_action([id, this] { stored_arguments[id] = std::any{true}; });
+				auto action = helpers::make_action([id, this] { stored_arguments[id] = std::any{true}; });
 				argument arg(id, short_arg + "|" + long_arg, action);
 				set_argument_status(required, help_text, arg);
 				place_argument(id, arg, short_arg, long_arg);
 			} else {
-				auto action = helpers::make_parametered_action<StoreType>(
+				auto action = helpers::make_action<StoreType>(
 					[id, this](StoreType const &value) { stored_arguments[id] = std::any{value}; });
 				argument arg(id, short_arg + "|" + long_arg, action);
 				set_argument_status(required, help_text, arg);
@@ -412,7 +424,7 @@ namespace argument_parser {
 										  std::optional<int> position = std::nullopt) {
 			assert_positional_not_exist(name);
 			int id = id_counter.fetch_add(1);
-			auto action = helpers::make_parametered_action<StoreType>(
+			auto action = helpers::make_action<StoreType>(
 				[id, this](StoreType const &value) { stored_arguments[id] = std::any{value}; });
 			argument arg(id, name, action);
 			set_argument_status(required, help_text, arg);

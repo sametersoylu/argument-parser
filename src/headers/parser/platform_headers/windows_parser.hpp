@@ -12,7 +12,7 @@ namespace argument_parser {
 	namespace v2 {
 		class windows_parser : public v2::base_parser {
 		public:
-			windows_parser(bool should_exit = true);
+			windows_parser(parser_settings const &settings = {});
 			using base_parser::display_help;
 		};
 	} // namespace v2

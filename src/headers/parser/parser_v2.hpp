@@ -57,15 +57,15 @@ namespace argument_parser::v2 {
 
 	class base_parser : argument_parser::base_parser {
 	public:
-		template <typename T> using typed_flag_value = std::variant<std::string, parametered_action<T>, bool, int, T *>;
-		using non_typed_flag_value = std::variant<std::string, non_parametered_action, bool, int>;
+		template <typename T> using typed_flag_value = std::variant<std::string, action_with_param<T>, bool, int, T *>;
+		using non_typed_flag_value = std::variant<std::string, action_no_param, bool, int>;
 
 		template <typename T> using typed_argument_pair = std::pair<add_argument_flags, typed_flag_value<T>>;
 		using non_typed_argument_pair = std::pair<add_argument_flags, non_typed_flag_value>;
 
 		template <typename T>
 		void add_argument(std::unordered_map<add_argument_flags, typed_flag_value<T>> const &argument_pairs) {
-			add_argument_impl<true, parametered_action<T>, T>(argument_pairs);
+			add_argument_impl<true, action_with_param<T>, T>(argument_pairs);
 		}
 
 		template <typename T> void add_argument(std::initializer_list<typed_argument_pair<T>> const &pairs) {
@@ -89,7 +89,7 @@ namespace argument_parser::v2 {
 		}
 
 		void add_argument(std::unordered_map<add_argument_flags, non_typed_flag_value> const &argument_pairs) {
-			add_argument_impl<false, non_parametered_action, void>(argument_pairs);
+			add_argument_impl<false, action_no_param, void>(argument_pairs);
 		}
 
 		argument_parser::base_parser &to_v1() {
@@ -122,13 +122,17 @@ namespace argument_parser::v2 {
 		void prepare_help_flag(bool should_exit = true) {
 			add_argument({{flags::ShortArgument, "h"},
 						  {flags::LongArgument, "help"},
-						  {flags::Action, helpers::make_non_parametered_action([this, should_exit] {
+						  {flags::Action, helpers::make_action([this, should_exit] {
 							   this->display_help(this->current_conventions());
 							   if (should_exit) {
 								   std::exit(0);
 							   }
 						   })},
 						  {flags::HelpText, "Prints this help text."}});
+		}
+
+		void set_settings(parser_settings const &settings) {
+			base::set_settings(settings);
 		}
 
 	private:
@@ -224,7 +228,7 @@ namespace argument_parser::v2 {
 
 					base::add_argument<typename T::value_type>(
 						short_arg, long_arg, help_text,
-						*static_cast<parametered_action<typename T::value_type> *>(&(*action)), required);
+						*static_cast<action_with_param<typename T::value_type> *>(&(*action)), required);
 					return;
 				}
 			}
@@ -375,7 +379,7 @@ namespace argument_parser::v2 {
 				if constexpr (!std::is_same_v<T, void> && deducers::is_vector_v<T>) {
 					base::add_positional_accumulator<typename T::value_type>(
 						positional_name, help_text,
-						*static_cast<parametered_action<typename T::value_type> *>(&(*action)), required, position);
+						*static_cast<action_with_param<typename T::value_type> *>(&(*action)), required, position);
 					return;
 				}
 			}
@@ -452,16 +456,15 @@ namespace argument_parser::v2 {
 		}
 
 		template <typename T> std::unique_ptr<action_base> make_reference_action(T *target) {
-			return helpers::make_parametered_action<T>([target](T const &value) { *target = value; }).clone();
+			return helpers::make_action<T>([target](T const &value) { *target = value; }).clone();
 		}
 
 		template <typename Vector> std::unique_ptr<action_base> make_accumulate_ref_action(Vector *target) {
 			if constexpr (std::is_same_v<Vector, int>) {
-				return helpers::make_non_parametered_action([target]() { *target += 1; }).clone();
+				return helpers::make_action([target]() { *target += 1; }).clone();
 			} else {
 				using Value = typename Vector::value_type;
-				return helpers::make_parametered_action<Value>(
-						   [target](Value const &value) { target->emplace_back(value); })
+				return helpers::make_action<Value>([target](Value const &value) { target->emplace_back(value); })
 					.clone();
 			}
 		}

@@ -15,7 +15,7 @@ namespace argument_parser {
 	namespace v2 {
 		class macos_parser : public v2::base_parser {
 		public:
-			explicit macos_parser(bool should_exit = true);
+			explicit macos_parser(parser_settings const &settings = {});
 			using base_parser::display_help;
 		};
 	} // namespace v2

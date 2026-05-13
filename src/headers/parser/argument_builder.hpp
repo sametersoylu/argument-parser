@@ -22,8 +22,8 @@ namespace argument_parser::builder {
 			reference,
 			accumulate,
 			count,
-			nonparametered_action,
-			parametered_action
+			action_no_param,
+			action_with_param
 		};
 
 		enum class extra_capability : unsigned { Store = static_cast<unsigned>(v2_flag::Reference) + 1, Flag };
@@ -321,9 +321,9 @@ namespace argument_parser::builder {
 				argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), non_type>;
 
 			next_argument next{*this};
-			next.m_action = std::make_shared<argument_parser::non_parametered_action>(
+			next.m_action = std::make_shared<argument_parser::action_no_param>(
 				std::function<void()>(std::forward<Callable>(handler)));
-			next.m_value_mode = value_mode::nonparametered_action;
+			next.m_value_mode = value_mode::action_no_param;
 			return next;
 		}
 
@@ -338,9 +338,9 @@ namespace argument_parser::builder {
 			using next_argument = argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), T>;
 
 			next_argument next{*this};
-			next.m_action = std::make_shared<argument_parser::parametered_action<T>>(
+			next.m_action = std::make_shared<argument_parser::action_with_param<T>>(
 				std::function<void(const T &)>(std::forward<Callable>(handler)));
-			next.m_value_mode = value_mode::parametered_action;
+			next.m_value_mode = value_mode::action_with_param;
 			return next;
 		}
 
@@ -352,8 +352,8 @@ namespace argument_parser::builder {
 			case value_mode::flag:
 				build_flag(parser);
 				return;
-			case value_mode::nonparametered_action:
-				build_nonparametered_action(parser);
+			case value_mode::action_no_param:
+				build_action_with_no_param(parser);
 				return;
 			case value_mode::store:
 				if constexpr (!std::is_same_v<store_type, non_type>) {
@@ -374,9 +374,9 @@ namespace argument_parser::builder {
 					return;
 				}
 				break;
-			case value_mode::parametered_action:
+			case value_mode::action_with_param:
 				if constexpr (!std::is_same_v<store_type, non_type>) {
-					build_parametered_action(parser);
+					build_action_with_param(parser);
 					return;
 				}
 				break;
@@ -535,9 +535,9 @@ namespace argument_parser::builder {
 			parser.template add_argument<store_type>(pairs);
 		}
 
-		auto build_parametered_action(argument_parser::v2::base_parser &parser) const -> void {
+		auto build_action_with_param(argument_parser::v2::base_parser &parser) const -> void {
 			auto const *typed_action =
-				dynamic_cast<argument_parser::parametered_action<store_type> const *>(m_action.get());
+				dynamic_cast<argument_parser::action_with_param<store_type> const *>(m_action.get());
 			if (typed_action == nullptr) {
 				throw std::logic_error("Stored action is not compatible with the requested parameter type.");
 			}
@@ -547,15 +547,14 @@ namespace argument_parser::builder {
 			parser.template add_argument<store_type>(pairs);
 		}
 
-		auto build_nonparametered_action(argument_parser::v2::base_parser &parser) const -> void {
-			auto const *nonparametered_action =
-				dynamic_cast<argument_parser::non_parametered_action const *>(m_action.get());
+		auto build_action_with_no_param(argument_parser::v2::base_parser &parser) const -> void {
+			auto const *nonparametered_action = dynamic_cast<argument_parser::action_no_param const *>(m_action.get());
 			if (nonparametered_action == nullptr) {
 				throw std::logic_error("Stored action is not a non-parametered action.");
 			}
 
 			if (is_positional()) {
-				auto wrapped_action = argument_parser::helpers::make_parametered_action<std::string>(
+				auto wrapped_action = argument_parser::helpers::make_action<std::string>(
 					[action = *nonparametered_action](std::string const &) { action.invoke(); });
 				auto pairs = make_typed_pairs<std::string>();
 				pairs[argument_parser::v2::flags::Action] = wrapped_action;

@@ -16,7 +16,7 @@ namespace argument_parser {
 	namespace v2 {
 		class linux_parser : public v2::base_parser {
 		public:
-			linux_parser(bool should_exit = true);
+			linux_parser(parser_settings const &settings = {});
 			using base_parser::display_help;
 		};
 	} // namespace v2
