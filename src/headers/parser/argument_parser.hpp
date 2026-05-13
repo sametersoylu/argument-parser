@@ -249,7 +249,15 @@ namespace argument_parser {
 		bool ignore_errors = false;
 	};
 
-	constexpr static inline parser_settings no_exit{false, false, false, false};
+	constexpr static inline parser_settings no_exit{
+		.should_exit_on_error = false,
+		.should_exit_on_missing_required = false,
+		.should_exit_on_unknown_argument = false,
+		.should_exit_on_help = false,
+
+		.ignore_unknown_arguments = false,
+		.ignore_errors = false,
+	};
 
 	/**
 	 * @brief Base class for parsing arguments from the command line.

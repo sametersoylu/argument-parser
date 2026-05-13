@@ -1,5 +1,6 @@
 
 #include <argparse>
+#include <argument_parser.hpp>
 #include <gnu_argument_convention.hpp>
 #include <iostream>
 #include <macros.h>
@@ -42,7 +43,7 @@ template <typename T> struct parser_trait<std::vector<T>> {
 using namespace argument_parser::v2::flags;
 
 auto main() -> int {
-	argument_parser::v2::parser parser({.should_exit_on_help = false});
+	argument_parser::v2::parser parser(argument_parser::no_exit);
 
 	new_argument()
 		.positional("count")

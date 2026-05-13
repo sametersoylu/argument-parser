@@ -13,7 +13,8 @@ A lightweight, modern, and highly customizable C++17 argument parser with native
 - `build_and_get(parser)` for storable builder modes, returning a small container that is populated after parsing completes.
 - Positional arguments with optional explicit ordering and support for `--` as a positional separator.
 - Trait-driven `format_hint` and `purpose_hint` metadata used in generated help text and parse errors.
-- Automatic help flag on `argument_parser::v2::parser` (`-h`, `--help`) with configurable exit behavior.
+- Automatic help flag on `argument_parser::v2::parser` (`-h`, `--help`) with configurable exit behavior through `parser_settings`.
+- `parser_settings` for choosing whether help, unknown arguments, parse errors, and missing required arguments exit or throw.
 - Auto-formatted help output.
 - Completion hooks via `parser.on_complete(...)`.
 - Pluggable conventions for GNU next-token, GNU equal-style, Windows next-token, and Windows inline `=` / `:` parsing, or bring your own!
@@ -35,7 +36,7 @@ A lightweight, modern, and highly customizable C++17 argument parser with native
 using argument_parser::builder::new_argument;
 
 int main() {
-    argument_parser::v2::parser parser(false); // --help prints without exiting immediately
+    argument_parser::v2::parser parser(argument_parser::no_exit); // throw instead of exiting
 
     int threshold = 0;
     std::vector<int> ids;
@@ -157,8 +158,8 @@ If you omit `help_text()`, `v2` uses the trait hints to generate help such as `A
 `argument_parser::v2::parser` automatically registers `-h` and `--help`.
 
 ```cpp
-argument_parser::v2::parser parser;       // help prints and exits
-argument_parser::v2::parser parser(false); // help prints without immediate exit
+argument_parser::v2::parser parser;                         // help prints and exits
+argument_parser::v2::parser parser(argument_parser::no_exit); // help prints without exiting
 ```
 
 You can also display help manually:
@@ -166,6 +167,39 @@ You can also display help manually:
 ```cpp
 parser.display_help(conventions);
 ```
+
+## Parser Settings
+
+Use `argument_parser::parser_settings` when the parser is embedded in a larger
+application, test, or REPL-like tool where parse failures should be handled by
+the caller instead of ending the process.
+
+```cpp
+argument_parser::parser_settings settings;
+settings.should_exit_on_help = false;
+settings.should_exit_on_error = false;
+settings.should_exit_on_unknown_argument = false;
+settings.should_exit_on_missing_required = false;
+settings.ignore_unknown_arguments = true;
+
+argument_parser::v2::parser parser(settings);
+```
+
+The convenience constant `argument_parser::no_exit` disables the four automatic
+exit paths while leaving unknown-argument handling enabled:
+
+```cpp
+argument_parser::v2::parser parser(argument_parser::no_exit);
+```
+
+Settings fields:
+
+- `should_exit_on_help`: exit with status `0` after automatic `-h` / `--help`.
+- `should_exit_on_error`: exit with status `1` for non-unknown parse errors; otherwise rethrow.
+- `should_exit_on_unknown_argument`: exit with status `1` for unknown arguments; otherwise rethrow.
+- `should_exit_on_missing_required`: exit with status `1` after reporting missing required arguments; otherwise throw.
+- `ignore_unknown_arguments`: skip unknown arguments that cannot be consumed as positionals.
+- `ignore_errors`: present in the public settings struct, but not currently read by the parser runtime.
 
 ## Supported Conventions
 

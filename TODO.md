@@ -19,8 +19,6 @@ After handle_parse(...) ends, we can call the on_parse_done callbacks. But this 
 1. Storable arguments. Those would be not actions, but stored values. So you could get them later on in the callback or somewhere else.
 2. The on_parse_done callbacks should be called after all actions are invoked. But we should make this a toggle, so the callback only gets executed if the user explicitly wants it to be called. By default we would enable it. 
 
-## Self reminder, implement this feature. It'd be helpful. 
-
 ### Update: 29 March. 2026
 Help text is clear, supports multi convention print, also provides hints for types that provides the hints in the traits.
 Positional argument support is here. Also we now have some tests to ensure the library works as intended. 
@@ -39,9 +37,8 @@ Configure CMAKE to ensure the library can be built as a library and can be insta
 # TODO 5: Display help | DONE  
 Display help doesn't reflect the conventions right now. Also it should come automatically, and should be allowed to overriden by user.
 
-# TODO 6: Accumulate repeated calls 
-Add support to letting users accumulate repeated calls to a flag. If the flag is called x times, the result should be x items stored in a vector, 
-instead of an action doing it. 
+# TODO 6: Accumulate repeated calls | DONE
+Add support to let users accumulate repeated calls to a flag. If the flag is called x times, the result should be x items stored in a vector, instead of an action doing it. 
 
 # TODO 7: Defaults/Implicits
 If given, an arguments default store value could be changed. If nothing was given use that value instead.

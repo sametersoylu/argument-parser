@@ -120,6 +120,72 @@ namespace argument_parser::helpers {
 
 Factory helpers for creating action objects used by `base_parser` and v2.
 
+### `parser_settings`
+
+```cpp
+struct parser_settings {
+    bool should_exit_on_error = true;
+    bool should_exit_on_missing_required = true;
+    bool should_exit_on_unknown_argument = true;
+    bool should_exit_on_help = true;
+
+    bool ignore_unknown_arguments = false;
+    bool ignore_errors = false;
+};
+
+constexpr static inline parser_settings no_exit{
+    false,
+    false,
+    false,
+    false
+};
+```
+
+`parser_settings` configures how the parser reacts to help, parse errors,
+unknown arguments, and missing required arguments. The default settings preserve
+CLI-style behavior: help exits after printing, unknown arguments and parse
+errors exit with status `1`, and missing required arguments print diagnostics
+and help before exiting.
+
+Use `argument_parser::no_exit` when embedding the parser in tests, tools, or
+larger applications that should receive exceptions instead of process exits:
+
+```cpp
+argument_parser::v2::parser parser(argument_parser::no_exit);
+```
+
+For targeted behavior, pass an explicit settings object to the v2 platform
+parser constructor:
+
+```cpp
+argument_parser::parser_settings settings;
+settings.should_exit_on_help = false;
+settings.should_exit_on_error = false;
+settings.should_exit_on_unknown_argument = false;
+settings.should_exit_on_missing_required = false;
+settings.ignore_unknown_arguments = true;
+
+argument_parser::v2::parser parser(settings);
+```
+
+The fields have these effects:
+
+- `should_exit_on_help`: controls whether the automatically registered v2
+  `-h` / `--help` action calls `std::exit(0)` after printing help.
+- `should_exit_on_error`: when `true`, non-unknown parse errors caught by
+  `handle_arguments(...)` call `std::exit(1)`; when `false`, the exception is
+  rethrown.
+- `should_exit_on_unknown_argument`: when `true`, unknown arguments caught by
+  `handle_arguments(...)` call `std::exit(1)`; when `false`, the unknown
+  argument exception is rethrown.
+- `should_exit_on_missing_required`: when `true`, missing required arguments
+  print diagnostics/help and call `std::exit(1)`; when `false`, they throw
+  `std::runtime_error`.
+- `ignore_unknown_arguments`: when `true`, tokens that match no convention and
+  cannot be consumed as positionals are skipped.
+- `ignore_errors`: reserved in the public settings struct in the current
+  worktree; no runtime branch currently reads it.
+
 ### `argument`
 
 ```cpp
@@ -397,7 +463,7 @@ Typical use is through the platform alias from `<argparse>`:
 using namespace argument_parser::v2::flags;
 
 int main() {
-    argument_parser::v2::parser parser;
+    argument_parser::v2::parser parser(argument_parser::no_exit);
 
     parser.add_argument<int>({
         {LongArgument, "count"},
@@ -463,7 +529,11 @@ only when `T` is exactly a `std::vector` specialization.
 
 `v2::base_parser` is the v2 facade. Concrete platform parsers such as
 `argument_parser::v2::linux_parser`, `macos_parser`, `windows_parser`, and the
-portable `<argparse>` alias `argument_parser::v2::parser` derive from it.
+portable `<argparse>` alias `argument_parser::v2::parser` derive from it. The
+v2 platform parser constructors accept `parser_settings const& settings = {}`.
+Use the default constructor for normal command-line tools, or pass
+`argument_parser::no_exit` / a custom `parser_settings` object when the caller
+should handle errors without automatic process exits.
 
 The class privately inherits from the v1 `argument_parser::base_parser` and
 re-exposes selected operations.
@@ -808,7 +878,7 @@ configuration.
 using argument_parser::builder::new_argument;
 
 int main() {
-    argument_parser::v2::parser parser(false);
+    argument_parser::v2::parser parser(argument_parser::no_exit);
 
     int threshold = 0;
     std::vector<int> ids;
