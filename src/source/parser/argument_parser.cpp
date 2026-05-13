@@ -130,10 +130,16 @@ namespace argument_parser {
 			auto name_it = reverse_positional_names.find(pos_id);
 			if (name_it == reverse_positional_names.end())
 				continue;
-			if (auto const &arg = argument_map.at(pos_id); arg.is_required()) {
+
+			auto const &arg = argument_map.at(pos_id);
+			if (arg.is_required()) {
 				ss << " <" << name_it->second << ">";
 			} else {
 				ss << " [" << name_it->second << "]";
+			}
+
+			if (arg.is_positional_accumulator()) {
+				ss << "...";
 			}
 		}
 		ss << "\n";

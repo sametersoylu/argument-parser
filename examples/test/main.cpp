@@ -9,7 +9,7 @@
 #include <vector>
 #include <windows_argument_convention.hpp>
 
-using argument = argument_parser::builder::argument<>;
+using argument_parser::builder::new_argument;
 
 using argument_parser::parsing_traits::hint_type;
 
@@ -42,9 +42,9 @@ template <typename T> struct parser_trait<std::vector<T>> {
 using namespace argument_parser::v2::flags;
 
 auto main() -> int {
-	argument_parser::v2::parser parser(false);
+	argument_parser::v2::parser parser(true);
 
-	argument::start()
+	start()
 		.positional("count")
 		.position(1)
 		.help_text("How many times to repeat the action.")
@@ -52,13 +52,13 @@ auto main() -> int {
 		.build(parser);
 
 	int captured_value = 0;
-	argument::start()
+	new_argument()
 		.long_argument("threshold")
 		.help_text("Store the parsed value through a reference.")
 		.reference(captured_value)
 		.build(parser);
 
-	argument::start()
+	new_argument()
 		.positional("captured")
 		.position(0)
 		.help_text("Store the parsed value through a reference.")
@@ -71,7 +71,7 @@ auto main() -> int {
 	//     {Reference, &captured_value},
 	// });
 
-	argument::start().short_argument("q").help_text("Store a boolean flag.").build(parser);
+	new_argument().short_argument("q").help_text("Store a boolean flag.").build(parser);
 
 	// argument::start()
 	//     .long_argument("regex")
@@ -79,14 +79,14 @@ auto main() -> int {
 	//     .store<std::optional<std::regex>>()
 	//     .build(parser);
 
-	argument::start()
+	new_argument()
 		.short_argument("e")
 		.long_argument("echo")
 		.help_text("Echo the parsed value.")
 		.action(echo)
 		.build(parser);
 
-	argument::start()
+	new_argument()
 		.long_argument("vecstr")
 		.short_argument("vs")
 		.action<std::vector<int>>([](std::vector<int> const &vecstr) {
@@ -96,8 +96,14 @@ auto main() -> int {
 		})
 		.build(parser);
 
+	auto accumulated_pos = new_argument()
+							   .short_argument("v")
+							   .help_text("turns on verbose execution. up to three levels of verbosity.")
+							   .count()
+							   .build_and_get(parser);
+
 	auto accumulate_vec =
-		argument::start().long_argument("vecstr1").short_argument("vs1").accumulate<int>().build_and_get(parser);
+		new_argument().long_argument("vecstr1").short_argument("vs1").accumulate<int>().build_and_get(parser);
 
 	parser.add_argument<std::vector<int>>({
 		{LongArgument, "accumulate"},
@@ -150,6 +156,10 @@ auto main() -> int {
 		for (auto const &str : *accumulate_vec) {
 			std::cout << str << '\n';
 		}
+	}
+
+	if (accumulated_pos) {
+		std::cout << "accumulated_pos: " << *accumulated_pos << '\n';
 	}
 
 	return 0;

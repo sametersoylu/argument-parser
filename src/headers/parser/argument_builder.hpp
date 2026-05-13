@@ -6,8 +6,8 @@
 #include <parser_v2.hpp>
 #include <type_traits>
 
-#ifndef ARGUMENT_PARSER_PARSER_V3_HPP
-#define ARGUMENT_PARSER_PARSER_V3_HPP
+#ifndef ARGUMENT_PARSER_PARSER_BUILDER_HPP
+#define ARGUMENT_PARSER_PARSER_BUILDER_HPP
 
 namespace argument_parser::builder {
 
@@ -21,6 +21,7 @@ namespace argument_parser::builder {
 			flag,
 			reference,
 			accumulate,
+			count,
 			nonparametered_action,
 			parametered_action
 		};
@@ -44,12 +45,17 @@ namespace argument_parser::builder {
 		constexpr mask_type required = bit(v2_flag::Required);
 		constexpr mask_type reference = bit(v2_flag::Reference);
 		constexpr mask_type accumulate = bit(v2_flag::Accumulate);
+		constexpr mask_type count = bit(
+			static_cast<v2_flag>(static_cast<int>(v2_flag::Accumulate) + (static_cast<int>(extra_capability::Store) |
+																		  static_cast<int>(extra_capability::Flag))));
 		constexpr mask_type store = bit(extra_capability::Store);
 		constexpr mask_type flag = bit(extra_capability::Flag);
 
-		constexpr mask_type value_mode_group = action | reference | accumulate | store | flag;
+		constexpr mask_type value_mode_group = action | reference | accumulate | count | store | flag;
 		constexpr mask_type initial = short_argument | long_argument | positional | help_text | action | required |
-									  reference | accumulate | store | flag;
+									  reference | accumulate | count | store | flag;
+
+		constexpr mask_type storable_mode_group = (count | store | flag | accumulate | reference) >> 1;
 
 		constexpr auto has(mask_type mask, mask_type capability) -> bool {
 			return (mask & capability) == capability;
@@ -69,6 +75,10 @@ namespace argument_parser::builder {
 
 		constexpr auto is_buildable(mask_type mask) -> bool {
 			return has_selected_identifier(mask);
+		}
+
+		constexpr auto is_build_and_gettable(mask_type mask) -> bool {
+			return has_selected_identifier(mask) && has(mask, storable_mode_group);
 		}
 	} // namespace builder_mask
 
@@ -158,7 +168,7 @@ namespace argument_parser::builder {
 			using next_argument =
 				argument<builder_mask::replace(current_mask,
 											   builder_mask::short_argument | builder_mask::long_argument |
-												   builder_mask::positional | builder_mask::flag,
+												   builder_mask::positional | builder_mask::flag | builder_mask::count,
 											   builder_mask::position),
 						 store_type>;
 
@@ -214,11 +224,13 @@ namespace argument_parser::builder {
 
 		template <typename T = std::string, mask_type current_mask = mask,
 				  std::enable_if_t<builder_mask::has(current_mask, builder_mask::accumulate), int> = 0>
-		auto accumulate() const
-			-> argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), std::vector<T>> {
+		auto accumulate() const -> argument<builder_mask::replace(current_mask, builder_mask::value_mode_group,
+																  builder_mask::storable_mode_group),
+											std::vector<T>> {
 			using vector_type = std::vector<T>;
-			using next_argument =
-				argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), vector_type>;
+			using next_argument = argument<builder_mask::replace(current_mask, builder_mask::value_mode_group,
+																 builder_mask::storable_mode_group),
+										   vector_type>;
 
 			next_argument next{*this};
 			next.m_value_mode = value_mode::accumulate;
@@ -227,12 +239,14 @@ namespace argument_parser::builder {
 
 		template <mask_type current_mask = mask,
 				  std::enable_if_t<builder_mask::has(current_mask, builder_mask::accumulate), int> = 0, typename T>
-		auto accumulate(T &value) const
-			-> argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), T> {
+		auto accumulate(T &value) const -> argument<
+			builder_mask::replace(current_mask, builder_mask::value_mode_group, builder_mask::storable_mode_group), T> {
 			static_assert(argument_parser::v2::deducers::is_vector_v<T>,
 						  "accumulate(target) requires a std::vector target.");
 
-			using next_argument = argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), T>;
+			using next_argument = argument<builder_mask::replace(current_mask, builder_mask::value_mode_group,
+																 builder_mask::storable_mode_group),
+										   T>;
 
 			next_argument next{*this};
 			next.m_reference = std::addressof(value);
@@ -241,9 +255,43 @@ namespace argument_parser::builder {
 		}
 
 		template <mask_type current_mask = mask,
+				  std::enable_if_t<builder_mask::has(current_mask, builder_mask::count), int> = 0>
+		auto count() const -> argument<builder_mask::replace(current_mask, builder_mask::value_mode_group,
+															 builder_mask::storable_mode_group),
+									   int> {
+			using next_argument = argument<builder_mask::replace(current_mask, builder_mask::value_mode_group,
+																 builder_mask::storable_mode_group),
+										   int>;
+
+			next_argument next{*this};
+			next.m_value_mode = value_mode::count;
+			return next;
+		}
+
+		template <mask_type current_mask = mask,
+				  std::enable_if_t<builder_mask::has(current_mask, builder_mask::count), int> = 0>
+		auto count(int &value) const -> argument<builder_mask::replace(current_mask, builder_mask::value_mode_group,
+																	   builder_mask::storable_mode_group),
+												 int> {
+
+			using next_argument = argument<builder_mask::replace(current_mask, builder_mask::value_mode_group,
+																 builder_mask::storable_mode_group),
+										   int>;
+
+			next_argument next{*this};
+			next.m_reference = std::addressof(value);
+			next.m_value_mode = value_mode::count;
+			return next;
+		}
+
+		template <mask_type current_mask = mask,
 				  std::enable_if_t<builder_mask::has(current_mask, builder_mask::flag), int> = 0>
-		auto flag() const -> argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), bool> {
-			using next_argument = argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), bool>;
+		auto flag() const -> argument<builder_mask::replace(current_mask, builder_mask::value_mode_group,
+															builder_mask::storable_mode_group),
+									  bool> {
+			using next_argument = argument<builder_mask::replace(current_mask, builder_mask::value_mode_group,
+																 builder_mask::storable_mode_group),
+										   bool>;
 
 			next_argument next{*this};
 			next.m_value_mode = value_mode::flag;
@@ -252,9 +300,11 @@ namespace argument_parser::builder {
 
 		template <mask_type current_mask = mask,
 				  std::enable_if_t<builder_mask::has(current_mask, builder_mask::reference), int> = 0, typename T>
-		auto reference(T &value) const
-			-> argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), T> {
-			using next_argument = argument<builder_mask::remove(current_mask, builder_mask::value_mode_group), T>;
+		auto reference(T &value) const -> argument<
+			builder_mask::replace(current_mask, builder_mask::value_mode_group, builder_mask::storable_mode_group), T> {
+			using next_argument = argument<builder_mask::replace(current_mask, builder_mask::value_mode_group,
+																 builder_mask::storable_mode_group),
+										   T>;
 
 			next_argument next{*this};
 			next.m_reference = std::addressof(value);
@@ -318,6 +368,7 @@ namespace argument_parser::builder {
 				}
 				break;
 			case value_mode::accumulate:
+			case value_mode::count:
 				if constexpr (!std::is_same_v<store_type, non_type>) {
 					build_accumulate(parser);
 					return;
@@ -341,7 +392,8 @@ namespace argument_parser::builder {
 			throw std::logic_error("The builder reached build() without a supported terminal value mode.");
 		}
 
-		template <mask_type current_mask = mask, std::enable_if_t<builder_mask::is_buildable(current_mask), int> = 0>
+		template <mask_type current_mask = mask,
+				  std::enable_if_t<builder_mask::is_build_and_gettable(current_mask), int> = 0>
 		auto build_and_get(argument_parser::v2::base_parser &parser) const -> container<store_type> {
 			assert_has_identifier();
 			switch (m_value_mode) {
@@ -349,6 +401,7 @@ namespace argument_parser::builder {
 			case value_mode::flag:
 			case value_mode::unresolved:
 			case value_mode::accumulate:
+			case value_mode::count:
 				build(parser);
 				break;
 			default:
@@ -380,9 +433,7 @@ namespace argument_parser::builder {
 			  m_required(other.m_required), m_action(other.m_action), m_reference(copy_reference(other.m_reference)),
 			  m_value_mode(other.m_value_mode) {}
 
-		template <typename T>
-		using typed_map =
-			std::unordered_map<v2_flag, v2::base_parser::typed_flag_value<T>>;
+		template <typename T> using typed_map = std::unordered_map<v2_flag, v2::base_parser::typed_flag_value<T>>;
 
 		using non_typed_map = std::unordered_map<v2_flag, v2::base_parser::non_typed_flag_value>;
 
@@ -537,6 +588,10 @@ namespace argument_parser::builder {
 
 		template <mask_type other_mask, typename other_store_type> friend class argument;
 	};
+
+	static inline auto new_argument() {
+		return argument<>::start();
+	}
 
 	namespace assertions {
 		struct noop_handler {

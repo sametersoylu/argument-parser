@@ -195,8 +195,10 @@ namespace argument_parser::v2 {
 				found_params[extended_add_argument_flags::Action] = true;
 				accumulates = true;
 				if constexpr (!std::is_same_v<T, void>) {
-					if constexpr (!deducers::is_vector_v<T>) {
-						throw std::logic_error("Expected vector (type does not have value_type member)");
+					if constexpr (std::is_same_v<T, int>) {
+						action = make_accumulate_action<T>(argument_pairs, ref_mode, short_arg, long_arg);
+					} else if constexpr (!deducers::is_vector_v<T>) {
+						throw std::logic_error("Expected vector or integer type");
 					} else {
 						if (action && !ref_mode) {
 							throw std::logic_error("Cannot use both action and accumulate for the same argument");
@@ -454,10 +456,14 @@ namespace argument_parser::v2 {
 		}
 
 		template <typename Vector> std::unique_ptr<action_base> make_accumulate_ref_action(Vector *target) {
-			using Value = typename Vector::value_type;
-			return helpers::make_parametered_action<Value>(
-					   [target](Value const &value) { target->emplace_back(value); })
-				.clone();
+			if constexpr (std::is_same_v<Vector, int>) {
+				return helpers::make_non_parametered_action([target]() { *target += 1; }).clone();
+			} else {
+				using Value = typename Vector::value_type;
+				return helpers::make_parametered_action<Value>(
+						   [target](Value const &value) { target->emplace_back(value); })
+					.clone();
+			}
 		}
 
 		template <typename Vector>
@@ -466,8 +472,14 @@ namespace argument_parser::v2 {
 			on_complete(
 				[this, short_arg = std::move(short_arg), long_arg = std::move(long_arg),
 				 accumulation_target](auto const &) {
-					if (accumulation_target->empty()) {
-						return;
+					if constexpr (std::is_same_v<int, Vector>) {
+						if (*accumulation_target == 0) {
+							return;
+						}
+					} else {
+						if (accumulation_target->empty()) {
+							return;
+						}
 					}
 
 					const auto sid = this->find_argument_id(short_arg);
@@ -484,8 +496,14 @@ namespace argument_parser::v2 {
 		void store_accumulated_on_complete(std::string positional_name, std::shared_ptr<Vector> accumulation_target) {
 			on_complete(
 				[this, positional_name = std::move(positional_name), accumulation_target](auto const &) {
-					if (accumulation_target->empty()) {
-						return;
+					if constexpr (std::is_same_v<int, Vector>) {
+						if (*accumulation_target == 0) {
+							return;
+						}
+					} else {
+						if (accumulation_target->empty()) {
+							return;
+						}
 					}
 
 					auto id = this->find_argument_id(positional_name);
