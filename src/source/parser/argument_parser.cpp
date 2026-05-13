@@ -1,4 +1,5 @@
 #include "argument_parser.hpp"
+#include "exceptions.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -6,6 +7,7 @@
 #include <iostream>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -28,8 +30,7 @@ bool contains(std::unordered_map<std::string, int> const &map, std::string const
 }
 
 namespace argument_parser {
-	argument::argument()
-		: id(0), action(std::make_unique<non_parametered_action>([] {})), required(false), invoked(false) {}
+	argument::argument() : id(0), action(std::make_unique<action_no_param>([] {})), required(false), invoked(false) {}
 
 	argument::argument(const argument &other)
 		: id(other.id), name(other.name), action(other.action->clone()), required(other.required),
@@ -331,8 +332,11 @@ namespace argument_parser {
 						next_positional_index = *slot + 1;
 					}
 				} else {
-					throw std::runtime_error("All trials for argument: \n\t\"" + *it + "\"\n failed with: \n" +
-											 error_stream.str());
+					if (m_settings.ignore_unknown_arguments) {
+						continue;
+					}
+					throw parser::unknown_argument_exception("All trials for argument: \n\t\"" + *it +
+															 "\"\n failed with: \n" + error_stream.str());
 				}
 			}
 		}
@@ -389,8 +393,21 @@ namespace argument_parser {
 		std::vector<found_argument> found_arguments;
 		std::optional<argument> found_help = std::nullopt;
 
-		extract_arguments(convention_types, found_arguments, found_help);
-		invoke_arguments(found_arguments, found_help);
+		try {
+			extract_arguments(convention_types, found_arguments, found_help);
+			invoke_arguments(found_arguments, found_help);
+		} catch (parser::unknown_argument_exception const &e) {
+			if (m_settings.should_exit_on_unknown_argument) {
+				std::exit(1);
+			}
+			throw e;
+		} catch (std::exception const &e) {
+			if (m_settings.should_exit_on_error) {
+				std::exit(1);
+			}
+			throw e;
+		}
+
 		check_for_required_arguments(convention_types);
 		fire_on_complete_events();
 	}
@@ -588,7 +605,10 @@ namespace argument_parser {
 			}
 			std::cerr << "\n";
 			display_help(convention_types);
-			std::exit(1);
+			if (m_settings.should_exit_on_missing_required) {
+				std::exit(1);
+			}
+			throw std::runtime_error("required arguments not provided");
 		}
 	}
 
