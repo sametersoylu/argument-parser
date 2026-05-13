@@ -1,6 +1,6 @@
 # argument-parser
 
-A lightweight, modern, and highly customizable C++17 argument parser with native platform argument collection, trait-driven typed parsing, pluggable option conventions, and a fluent `v2` builder API.
+A lightweight, modern, and highly customizable C++17 argument parser with native platform argument collection, trait-driven typed parsing, repeatable argument accumulation, pluggable option conventions, and a fluent `v2` builder API.
 
 > `v1` is deprecated and mainly kept as implementation history. For new projects, use `argument_parser::v2` together with `argument_parser::builder`.
 
@@ -8,11 +8,13 @@ A lightweight, modern, and highly customizable C++17 argument parser with native
 
 - Native platform parser alias: `argument_parser::v2::parser` resolves to the current platform parser and reads arguments directly from OS APIs.
 - Fluent builder API with compile-time builder constraints that prevent invalid combinations after a terminal/mutually exclusive mode has been selected.
-- Type-safe parsing and extraction. Just extend `parser_trait<T>` for your types and if just want to store use `get_optional<T>()`!
+- Type-safe parsing and extraction. Extend `parser_trait<T>` for your own types and retrieve stored values with `get_optional<T>()`.
+- Repeatable value accumulation with `accumulate<T>()`, `accumulate(vector&)`, `count()`, and `count(int&)`.
+- `build_and_get(parser)` for storable builder modes, returning a small container that is populated after parsing completes.
 - Positional arguments with optional explicit ordering and support for `--` as a positional separator.
 - Trait-driven `format_hint` and `purpose_hint` metadata used in generated help text and parse errors.
 - Automatic help flag on `argument_parser::v2::parser` (`-h`, `--help`) with configurable exit behavior.
-- Auto-formatted help output..
+- Auto-formatted help output.
 - Completion hooks via `parser.on_complete(...)`.
 - Pluggable conventions for GNU next-token, GNU equal-style, Windows next-token, and Windows inline `=` / `:` parsing, or bring your own!
 - Testing helper + pseudo command handler `argument_parser::v2::fake_parser`.
@@ -28,15 +30,17 @@ A lightweight, modern, and highly customizable C++17 argument parser with native
 #include <argparse>
 #include <iostream>
 #include <string>
+#include <vector>
 
-using argument = argument_parser::builder::argument<>;
+using argument_parser::builder::new_argument;
 
 int main() {
     argument_parser::v2::parser parser(false); // --help prints without exiting immediately
 
     int threshold = 0;
+    std::vector<int> ids;
 
-    argument::start()
+    new_argument()
         .short_argument("e")
         .long_argument("echo")
         .action<std::string>([](std::string const& text) {
@@ -44,26 +48,32 @@ int main() {
         })
         .build(parser);
 
-    argument::start()
+    new_argument()
         .long_argument("file")
         .store<std::string>()
         .required()
         .help_text("Input file to process.")
         .build(parser);
 
-    argument::start()
+    new_argument()
         .long_argument("threshold")
         .reference(threshold)
+        .help_text("Numeric threshold.")
         .build(parser);
 
-    argument::start()
+    auto verbose = new_argument()
         .short_argument("v")
-        .long_argument("verbose")
-        .flag()
-        .help_text("Enable verbose output.")
+        .help_text("Increase verbosity. Repeat for a higher level.")
+        .count()
+        .build_and_get(parser);
+
+    new_argument()
+        .long_argument("id")
+        .help_text("Collect an id. May be repeated.")
+        .accumulate(ids)
         .build(parser);
 
-    argument::start()
+    new_argument()
         .positional("output")
         .position(0)
         .help_text("Output file.")
@@ -89,6 +99,11 @@ int main() {
     }
 
     std::cout << "threshold: " << threshold << '\n';
+    std::cout << "ids: " << ids.size() << '\n';
+
+    if (verbose) {
+        std::cout << "verbosity: " << *verbose << '\n';
+    }
 }
 ```
 
@@ -129,7 +144,7 @@ struct argument_parser::parsing_traits::parser_trait<Point> {
 Then use the type directly from the builder:
 
 ```cpp
-argument::start()
+new_argument()
     .long_argument("point")
     .store<Point>()
     .build(parser);
@@ -161,9 +176,15 @@ parser.display_help(conventions);
 
 Mix any of them in the same parser by passing the conventions you want to `handle_arguments()`.
 
-## Builder Modes
+## Builder API
 
-`argument_parser::builder::argument<>` is a staged builder. `build(parser)` is the terminal call.
+`argument_parser::builder::argument<>` is a staged builder. Prefer `argument_parser::builder::new_argument()` as the entry point:
+
+```cpp
+using argument_parser::builder::new_argument;
+```
+
+`build(parser)` registers the argument and returns `void`. `build_and_get(parser)` is available for storable modes and returns a lightweight `builder::container<T>`. The container is filled by an internal completion hook after `handle_arguments(...)` runs.
 
 Before `build(...)`, you compose an argument from three kinds of steps:
 
@@ -173,12 +194,74 @@ Before `build(...)`, you compose an argument from three kinds of steps:
   - `store<T>()` to parse and retain a value for later `get_optional<T>()`
   - `flag()` to store a boolean presence flag
   - `reference(value)` to write the parsed result directly into an existing variable
+  - `accumulate<T>()` to collect repeated values into a stored `std::vector<T>`
+  - `accumulate(vector)` to collect repeated values into an existing `std::vector<T>`
+  - `count()` to store how many times an option appears
+  - `count(value)` to write the occurrence count into an existing `int`
   - `action([] { ... })` for no-value callbacks
   - `action<T>([](T const&) { ... })` for typed value callbacks
 
-Once you select one value behavior, the other value behavior methods are disabled at compile time, so combinations like `store<T>().action(...)` or `flag().reference(value)` are rejected by the type system. Also you cannot use the same method repeatedly as it is also disabled at compile time by the type system.
+Once you select one value behavior, the other value behavior methods are disabled at compile time, so combinations like `store<T>().action(...)` or `flag().reference(value)` are rejected by the type system. The same staged typing also prevents repeating one-shot methods such as `help_text(...)`, `position(...)`, or `store<T>()` on the same builder chain.
 
 If you do not select a value behavior explicitly, `build(parser)` uses the default for the argument kind: named arguments become boolean flags, while positional arguments store a `std::string`.
+
+## Accumulators and Counts
+
+Use `accumulate<T>()` when the parser should accept the same value-bearing argument multiple times and store all parsed values:
+
+```cpp
+auto values = new_argument()
+    .short_argument("n")
+    .long_argument("number")
+    .accumulate<int>()
+    .build_and_get(parser);
+
+parser.handle_arguments(conventions);
+
+if (values) {
+    for (int value : *values) {
+        std::cout << value << '\n';
+    }
+}
+```
+
+Use `accumulate(target)` to append into a vector you own:
+
+```cpp
+std::vector<int> ids;
+
+new_argument()
+    .long_argument("id")
+    .accumulate(ids)
+    .build(parser);
+```
+
+Use `count()` for repeatable flags such as `-v -v -v`:
+
+```cpp
+auto verbosity = new_argument()
+    .short_argument("v")
+    .count()
+    .build_and_get(parser);
+```
+
+The lower-level `v2::base_parser::add_argument` API exposes the same accumulator behavior through the `Accumulate` flag:
+
+```cpp
+using namespace argument_parser::v2::flags;
+
+parser.add_argument<std::vector<int>>({
+    {LongArgument, "id"},
+    {HelpText, "Collect an id. May be repeated."},
+    {Accumulate, true},
+});
+
+std::vector<int> captured_ids;
+parser.add_argument<std::vector<int>>({
+    {LongArgument, "captured-id"},
+    {Accumulate, &captured_ids},
+});
+```
 
 ## Testing
 
