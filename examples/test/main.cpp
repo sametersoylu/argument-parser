@@ -44,7 +44,7 @@ using namespace argument_parser::v2::flags;
 auto main() -> int {
 	argument_parser::v2::parser parser(true);
 
-	start()
+	new_argument()
 		.positional("count")
 		.position(1)
 		.help_text("How many times to repeat the action.")
